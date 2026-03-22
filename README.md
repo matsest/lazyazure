@@ -142,4 +142,4 @@ See `PLAN.md` for the full implementation roadmap.
 
 ## License
 
-MIT
+[MIT](LICENSE)
