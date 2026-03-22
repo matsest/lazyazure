@@ -1,0 +1,26 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+    groups:
+      azure-sdk-for-go:
+        patterns:
+          - "github.com/Azure/azure-sdk-for-go/*"
+      golang-other:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "github.com/Azure/azure-sdk-for-go/*"
