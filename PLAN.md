@@ -21,137 +21,76 @@ A TUI application for Azure resource management, inspired by lazydocker. It prov
 
 ---
 
-## Phase 1: MVP - Authentication & Subscription List
+## Phase 1: MVP - Authentication & Subscription List ✅ COMPLETE
 
 **Goal:** Working TUI showing Azure auth status and subscription picker
 
 ### Implementation Steps:
 
-1. **Project Setup**
+1. **Project Setup** ✅
    - Initialize Go module: `go mod init github.com/matsest/lazyazure`
    - Add dependencies:
      - `github.com/jesseduffield/gocui` (TUI)
      - `github.com/Azure/azure-sdk-for-go/sdk/azidentity`
      - `github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions`
-     - `github.com/samber/lo` (utility functions)
-     - `github.com/jesseduffield/lazycore/pkg/boxlayout` (layout)
-     - `github.com/sirupsen/logrus` (logging)
 
-2. **Azure Client Layer** (`pkg/azure/`)
+2. **Azure Client Layer** (`pkg/azure/`) ✅
    - `client.go`: Wrapper around Azure SDK clients
-   - `auth.go`: Authentication using `DefaultAzureCredential`
-     - Automatically uses Azure CLI credentials if available
-     - Gets current user info
    - `subscriptions.go`: List subscriptions with name and ID
 
-3. **Domain Models** (`pkg/domain/`)
+3. **Domain Models** (`pkg/domain/`) ✅
    - `subscription.go`: Subscription struct with Name, ID, State
-   - `user.go`: User info (name, email, tenant)
+   - `user.go`: User info (name)
 
-4. **TUI Foundation** (`pkg/gui/`)
-   - `gui.go`: Main GUI struct, event loop
-   - `layout.go`: View arrangement (left sidebar + right main)
-   - `views.go`: View creation (side, main, status bar)
-   - `keybindings.go`: Navigation (arrow keys, tabs, quit)
+4. **TUI Foundation** (`pkg/gui/`) ✅
+   - `gui.go`: Main GUI struct, event loop, view arrangement
 
-5. **Panels** (`pkg/gui/panels/`)
-   - Reusable `SideListPanel[T]` with generics
-   - `subscriptions_panel.go`: List subscriptions
-   - `auth_panel.go`: Show current user info
+5. **Panels** (`pkg/gui/panels/`) ✅
+   - `filtered_list.go`: Generic filtered list component
 
-6. **Right Panel Viewer** (`pkg/gui/viewers/`)
-   - `json_viewer.go`: Pretty-printed JSON view
-   - `summary_viewer.go`: Key-value table format
-   - Tab switching between views
+6. **Right Panel Viewer** ✅
+   - JSON and Summary tabs implemented directly in gui.go
 
-7. **Main Entry** (`main.go`)
+7. **Main Entry** (`main.go`) ✅
    - Initialize Azure client with DefaultAzureCredential
    - Start GUI event loop
 
 ---
 
-## Phase 2: Resource Groups & Navigation 🔄 IN PROGRESS (Hang Issue Fixed, Layout Changes Needed)
+## Phase 2: Resource Groups & Navigation ✅ COMPLETE
 
 **Goal:** Interactive hierarchy: Subscriptions → Resource Groups
 
-### Current Issues Fixed:
-- ✅ **Hang Issue**: Fixed race condition in async task updates - all UI updates now properly queued through `gui.g.Update()`
-
-### Layout Changes Needed:
-Current implementation uses a single dynamic side panel. Need to change to lazydocker-style stacked panels:
-
-**New Layout Design:**
-```
-Left Sidebar (stacked panels):
-┌─────────────────────┐
-│ Auth                │ <- Show current user (compact)
-├─────────────────────┤
-│ Subscriptions       │ <- List of subscriptions
-│ • Sub A             │
-│ • Sub B  [selected] │
-├─────────────────────┤
-│ Resource Groups     │ <- List of RGs for selected sub
-│ • RG 1              │
-│ • RG 2  [selected] │
-├─────────────────────┤
-│ Resources           │ <- Future: list resources
-└─────────────────────┘
-
-Right Panel (viewer):
-┌──────────────────────────────────┐
-│ Details [Summary] [JSON]        │
-│                                  │
-│ Shows info for selected item    │
-│ from any left panel             │
-└──────────────────────────────────┘
-```
-
-### Implementation Steps:
+### Implementation Summary:
 
 1. **Azure Client Updates** ✅
-   - Add `resourcegroups.go`: List resource groups with name, location, state
+   - Added `resourcegroups.go`: List resource groups with name, location, state
+   - Uses `armresources` SDK
 
 2. **Domain Models** ✅
    - `resourcegroup.go`: ResourceGroup struct with Name, Location, ID, ProvisioningState, Tags
 
-3. **Navigation System** ✅
-   - Context-aware left panel (switch between subscriptions and resource groups view)
-   - `viewMode` state tracks current view ("subscriptions" or "resourcegroups")
-   - Navigation with arrow keys (j/k or ↑/↓)
-   - Enter key to drill down from subscriptions to resource groups
-   - Escape or 'h' key to go back to subscriptions
+3. **Layout Redesign** ✅
+   - Stacked panel layout (inspired by lazydocker)
+   - Auth panel (3 lines) - shows current user
+   - Subscriptions panel (40% of sidebar)
+   - Resource Groups panel (remaining space)
+   - All panels visible simultaneously
 
-4. **Updated Panels** ✅
-   - Dynamic side panel title changes based on view mode
-   - `refreshSidePanel()` displays subscriptions or resource groups based on viewMode
-   - Navigation methods updated to work with both data types
+4. **Navigation System** ✅
+   - Tab key switches between subscriptions and resource groups panels
+   - Enter key on subscription loads resource groups
+   - Arrow keys navigate within active panel
+   - Visual indicator (▶) shows active panel
 
 5. **Right Panel** ✅
-   - `renderSubscriptionDetails()`: Shows subscription details (name, ID, state, tenant)
-   - `renderResourceGroupDetails()`: Shows resource group details (name, location, ID, provisioning state, tags)
-   - Both support Summary and JSON tabs
+   - Shows subscription details (name, ID, state, tenant)
+   - Shows resource group details (name, location, ID, provisioning state, tags)
+   - Summary and JSON tabs
 
-6. **Status Bar Updates** ✅
-   - Shows different messages for subscriptions vs resource groups view
+6. **Status Bar** ✅
    - Context-sensitive help text
-
-### Known Issues (Being Fixed):
-- ~~Hang when loading resource groups~~ ✅ Fixed: Race condition in async UI updates
-- Layout needs to change to stacked panels (see New Layout Design above)
-
-### Next Steps:
-1. Redesign side panel layout to show auth, subs, RGs stacked
-2. Click/select in subscriptions panel loads RGs panel
-3. Each panel independently scrollable
-4. Right panel shows details for whatever is selected in left panels
-
-4. **Updated Panels**
-   - `resourcegroups_panel.go`: List groups for selected subscription
-   - Enhance `subscriptions_panel.go`: On select, load resource groups
-
-5. **Right Panel**
-   - Show resource group details (name, location, provisioning state, tags)
-   - JSON and summary tabs
+   - Shows current panel and available actions
 
 ---
 
@@ -223,47 +162,34 @@ Right Panel (viewer):
 
 ```
 lazyazure/
-├── main.go
+├── main.go                       # Entry point
 ├── go.mod
 ├── go.sum
+├── LICENSE                       # MIT License
+├── README.md                     # User documentation
+├── AGENTS.md                     # Development guidelines for AI agents
+├── PLAN.md                       # This file - implementation roadmap
 ├── pkg/
-│   ├── app/
-│   │   └── app.go              # Bootstrap & DI
 │   ├── azure/
-│   │   ├── client.go           # Azure SDK wrapper
-│   │   ├── auth.go             # Authentication
-│   │   ├── subscriptions.go    # Subscription operations
-│   │   ├── resourcegroups.go   # Resource group operations
-│   │   └── resources.go        # Resource operations
+│   │   ├── client.go            # Azure SDK wrapper with DefaultAzureCredential
+│   │   ├── client_test.go       # Azure client tests
+│   │   ├── subscriptions.go     # Subscription operations
+│   │   ├── resourcegroups.go    # Resource group operations
+│   │   └── resourcegroups_test.go # RG tests
 │   ├── domain/
-│   │   ├── user.go
-│   │   ├── subscription.go
-│   │   ├── resourcegroup.go
-│   │   └── resource.go
+│   │   ├── user.go              # User domain model
+│   │   ├── subscription.go      # Subscription domain model
+│   │   └── resourcegroup.go     # ResourceGroup domain model
 │   ├── gui/
-│   │   ├── gui.go              # Main GUI & event loop
-│   │   ├── layout.go           # View arrangement
-│   │   ├── views.go            # View definitions
-│   │   ├── keybindings.go
-│   │   ├── panels/
-│   │   │   ├── side_list_panel.go   # Generic panel
-│   │   │   ├── context_state.go     # Tab management
-│   │   │   ├── filtered_list.go     # Searchable list
-│   │   │   ├── auth_panel.go
-│   │   │   ├── subscriptions_panel.go
-│   │   │   ├── resourcegroups_panel.go
-│   │   │   └── resources_panel.go
-│   │   └── viewers/
-│   │       ├── json_viewer.go
-│   │       └── summary_viewer.go
-│   ├── config/
-│   │   └── config.go
-│   └── tasks/
-│       └── tasks.go            # Async operations
-├── internal/
+│   │   ├── gui.go               # Main GUI controller with all TUI logic
+│   │   ├── gui_test.go          # GUI tests
+│   │   └── panels/
+│   │       └── filtered_list.go # Generic filtered list component
+│   ├── tasks/
+│   │   ├── tasks.go             # Async task management
+│   │   └── tasks_test.go        # Task manager tests
 │   └── utils/
-│       └── helpers.go
-└── README.md
+│       └── logger.go            # Debug logging (opt-in via LAZYAZURE_DEBUG)
 ```
 
 ---
@@ -280,10 +206,12 @@ lazyazure/
 
 ## MVP Success Criteria
 
-- [ ] User can launch and see current Azure CLI identity
-- [ ] Left panel shows list of subscriptions (name, ID)
-- [ ] Can navigate subscriptions with arrow keys
-- [ ] Right panel shows subscription details in JSON and summary tabs
-- [ ] Can switch tabs with `[` and `]`
-- [ ] App gracefully handles Azure CLI not being logged in
-- [ ] Clean exit with `q` or `Ctrl+C`
+- [x] User can launch and see current Azure CLI identity
+- [x] Left panel shows list of subscriptions (name, ID)
+- [x] Can navigate subscriptions with arrow keys
+- [x] Right panel shows subscription details in JSON and summary tabs
+- [x] Can switch tabs with `[` and `]`
+- [x] App gracefully handles Azure CLI not being logged in
+- [x] Clean exit with `q` or `Ctrl+C`
+- [x] Navigate to resource groups within subscriptions
+- [x] View resource group details (name, location, provisioning state, tags)
