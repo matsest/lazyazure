@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -915,17 +916,18 @@ func (gui *Gui) nextTab(g *gocui.Gui, v *gocui.View) error {
 
 // ANSI color codes
 const (
-	colorBoldGreen = "\x1b[1;32m" // Bold green for keys (matching github-dark style)
-	colorWhite     = "\x1b[37m"   // White for values
-	colorReset     = "\x1b[0m"    // Reset
+	// Color 114 from 256-color palette (github-dark key color) + bold
+	colorBoldKey = "\x1b[1;38;5;114m" // Bold + green (color 114)
+	colorWhite   = "\x1b[37m"         // White for values
+	colorReset   = "\x1b[0m"          // Reset
 )
 
 // printKeyValue prints a key-value pair with bold green key and white value
 func printKeyValue(view *gocui.View, key string, value string) {
-	fmt.Fprintf(view, "%s%s:%s %s\n", colorBoldGreen, key, colorReset, value)
+	fmt.Fprintf(view, "%s%s:%s %s\n", colorBoldKey, key, colorReset, value)
 }
 
-// highlightJSON uses Chroma to syntax highlight JSON output
+// highlightJSON uses Chroma to syntax highlight JSON output with bold keys
 func highlightJSON(jsonData string) string {
 	// Use the JSON lexer
 	lexer := lexers.Get("json")
@@ -933,7 +935,7 @@ func highlightJSON(jsonData string) string {
 		lexer = lexers.Fallback
 	}
 
-	// Use github-dark theme (good default for dark terminals)
+	// Use github-dark theme
 	style := styles.Get("github-dark")
 	if style == nil {
 		style = styles.Fallback
@@ -957,7 +959,12 @@ func highlightJSON(jsonData string) string {
 		return jsonData // Return unformatted on error
 	}
 
-	return buf.String()
+	// Post-process to add bold to green keys (color 114)
+	// Replace [38;5;114m with [1;38;5;114m to add bold
+	result := buf.String()
+	result = strings.ReplaceAll(result, "\x1b[38;5;114m", "\x1b[1;38;5;114m")
+
+	return result
 }
 
 func (gui *Gui) refreshMainPanel() {
