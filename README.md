@@ -99,6 +99,28 @@ LazyAzure uses Azure's `DefaultAzureCredential` which automatically tries multip
 
 For most users, simply run `az login` before starting lazyazure.
 
+## Demo Mode
+
+LazyAzure includes a demo mode that runs with mock Azure data - no Azure credentials required! This is perfect for:
+- Creating GIFs or screenshots for documentation
+- Testing the UI without a real Azure subscription
+- Demonstrating features to users
+
+To run in demo mode:
+
+```bash
+LAZYAZURE_DEMO=1 ./lazyazure
+```
+
+Demo mode provides:
+- 2 mock subscriptions (Demo Production & Demo Development)
+- 4 resource groups per subscription with various locations
+- Multiple resource types (Storage Accounts, Key Vaults, VMs, SQL Databases, Load Balancers)
+- Realistic nested properties and tags
+- Simulated API response times for authentic feel
+
+All data in demo mode is completely fake and safe to display publicly.
+
 ## Debug Logging
 
 To enable debug logging for troubleshooting, set the `LAZYAZURE_DEBUG` environment variable:
@@ -123,9 +145,13 @@ lazyazure/
 ├── pkg/
 │   ├── azure/
 │   │   ├── client.go            # Azure SDK wrapper
+│   │   ├── factory.go           # Client factory for dependency injection
 │   │   ├── subscriptions.go     # Subscription operations
 │   │   ├── resourcegroups.go    # Resource group operations
 │   │   └── resources.go         # Generic resource operations
+│   ├── demo/
+│   │   ├── client.go            # Demo client (mock Azure data)
+│   │   └── data.go              # Demo data structures
 │   ├── domain/
 │   │   ├── user.go              # User domain model
 │   │   ├── subscription.go      # Subscription domain model
@@ -133,6 +159,7 @@ lazyazure/
 │   │   └── resource.go          # Generic Resource domain model
 │   ├── gui/
 │   │   ├── gui.go               # Main TUI controller
+│   │   ├── interfaces.go        # Client interfaces
 │   │   └── panels/
 │   │       └── filtered_list.go # Generic filtered list
 │   ├── tasks/

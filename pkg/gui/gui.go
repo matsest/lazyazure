@@ -14,7 +14,6 @@ import (
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/jesseduffield/gocui"
-	"github.com/matsest/lazyazure/pkg/azure"
 	"github.com/matsest/lazyazure/pkg/domain"
 	"github.com/matsest/lazyazure/pkg/tasks"
 	"github.com/matsest/lazyazure/pkg/utils"
@@ -22,12 +21,13 @@ import (
 
 // Gui is the main GUI controller
 type Gui struct {
-	g           *gocui.Gui
-	azureClient *azure.Client
-	subClient   *azure.SubscriptionsClient
-	rgClient    *azure.ResourceGroupsClient
-	resClient   *azure.ResourcesClient
-	taskManager *tasks.TaskManager
+	g             *gocui.Gui
+	azureClient   AzureClient
+	clientFactory AzureClientFactory
+	subClient     SubscriptionsClient
+	rgClient      ResourceGroupsClient
+	resClient     ResourcesClient
+	taskManager   *tasks.TaskManager
 
 	// Views - Left sidebar (stacked panels)
 	authView           *gocui.View
@@ -58,12 +58,13 @@ type Gui struct {
 }
 
 // NewGui creates a new GUI instance
-func NewGui(azureClient *azure.Client) (*Gui, error) {
+func NewGui(azureClient AzureClient, clientFactory AzureClientFactory) (*Gui, error) {
 	return &Gui{
-		azureClient: azureClient,
-		taskManager: tasks.NewTaskManager(),
-		tabIndex:    0,
-		activePanel: "subscriptions",
+		azureClient:   azureClient,
+		clientFactory: clientFactory,
+		taskManager:   tasks.NewTaskManager(),
+		tabIndex:      0,
+		activePanel:   "subscriptions",
 	}, nil
 }
 
@@ -105,7 +106,7 @@ func (gui *Gui) Run() error {
 
 	// Initialize Azure clients
 	utils.Log("Gui.Run: Initializing Azure clients...")
-	subClient, err := gui.azureClient.InitSubscriptionsClient()
+	subClient, err := gui.clientFactory.NewSubscriptionsClient()
 	if err != nil {
 		utils.Log("Gui.Run: ERROR initializing subscription client: %v", err)
 		return fmt.Errorf("failed to initialize subscription client: %w", err)
@@ -1186,7 +1187,7 @@ func (gui *Gui) loadResourceGroups(subscriptionID string) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		rgClient, err := azure.NewResourceGroupsClient(gui.azureClient, subscriptionID)
+		rgClient, err := gui.clientFactory.NewResourceGroupsClient(subscriptionID)
 		if err != nil {
 			utils.Log("loadResourceGroups: Error creating client: %v", err)
 			return
@@ -1226,7 +1227,7 @@ func (gui *Gui) loadResources(subscriptionID string, resourceGroupName string) {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		resClient, err := azure.NewResourcesClient(gui.azureClient, subscriptionID)
+		resClient, err := gui.clientFactory.NewResourcesClient(subscriptionID)
 		if err != nil {
 			utils.Log("loadResources: Error creating client: %v", err)
 			return

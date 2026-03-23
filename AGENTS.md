@@ -188,6 +188,9 @@ go build .
 # Run with debug logging
 LAZYAZURE_DEBUG=1 ./lazyazure
 
+# Run in demo mode (mock data, no Azure credentials needed)
+LAZYAZURE_DEMO=1 ./lazyazure
+
 # Test
 go test ./pkg/...
 ```
@@ -199,11 +202,16 @@ pkg/
 ├── azure/          # Azure SDK clients
 │   ├── client.go            # Azure SDK wrapper with DefaultAzureCredential
 │   ├── client_test.go       # Azure client tests
+│   ├── factory.go           # Client factory for dependency injection
 │   ├── subscriptions.go     # Subscription operations
 │   ├── resourcegroups.go    # Resource group operations
 │   ├── resourcegroups_test.go # RG tests
 │   ├── resources.go         # Generic resource operations
 │   └── api_versions.go      # Dynamic API version lookup
+├── demo/           # Demo mode (mock Azure data)
+│   ├── data.go              # Mock data structures
+│   ├── client.go            # Demo client implementing AzureClient interface
+│   └── client_test.go       # Demo client tests
 ├── domain/         # Domain models (structs)
 │   ├── user.go              # User domain model
 │   ├── subscription.go      # Subscription domain model
@@ -213,6 +221,7 @@ pkg/
 ├── gui/            # TUI implementation
 │   ├── gui.go               # Main GUI controller with all TUI logic
 │   ├── gui_test.go          # GUI tests
+│   ├── interfaces.go        # Client interfaces for abstraction
 │   └── panels/
 │       └── filtered_list.go # Generic filtered list component
 ├── tasks/          # Async task management
@@ -266,11 +275,13 @@ pkg/
 Before finishing a session:
 
 - [ ] Code builds without errors: `go build .`
+- [ ] Tests have been updated or added per the guideline in this file
 - [ ] Tests pass: `go test ./pkg/...`
 - [ ] Code is properly formatted: `gofmt -l .` returns empty
 - [ ] Debug logging is properly guarded with `LAZYAZURE_DEBUG` check
 - [ ] No mutex deadlocks introduced (verify lock patterns)
 - [ ] Documentation updated if needed (README.md, this file)
+- [ ] File organization in README and AGENTS is updated
 
 ## Key Lessons from Development
 

@@ -26,6 +26,13 @@ func (c *Client) InitSubscriptionsClient() (*SubscriptionsClient, error) {
 	return NewSubscriptionsClient(c)
 }
 
+// InitSubscriptionsClientInterface initializes the subscription client and returns interface
+func (c *Client) InitSubscriptionsClientInterface() (interface {
+	ListSubscriptions(ctx context.Context) ([]*domain.Subscription, error)
+}, error) {
+	return NewSubscriptionsClient(c)
+}
+
 // NewClient creates a new Azure client using DefaultAzureCredential
 func NewClient() (*Client, error) {
 	// Use DefaultAzureCredential which automatically:
