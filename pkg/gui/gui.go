@@ -1,12 +1,16 @@
 package gui
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
 
+	"github.com/alecthomas/chroma/v2/formatters"
+	"github.com/alecthomas/chroma/v2/lexers"
+	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/jesseduffield/gocui"
 	"github.com/matsest/lazyazure/pkg/azure"
 	"github.com/matsest/lazyazure/pkg/domain"
@@ -921,6 +925,41 @@ func printKeyValue(view *gocui.View, key string, value string) {
 	fmt.Fprintf(view, "%s%s:%s %s\n", colorCyan, key, colorReset, value)
 }
 
+// highlightJSON uses Chroma to syntax highlight JSON output
+func highlightJSON(jsonData string) string {
+	// Use the JSON lexer
+	lexer := lexers.Get("json")
+	if lexer == nil {
+		lexer = lexers.Fallback
+	}
+
+	// Use the monokai theme (good for dark terminals)
+	style := styles.Get("monokai")
+	if style == nil {
+		style = styles.Fallback
+	}
+
+	// Use the terminal formatter
+	formatter := formatters.Get("terminal")
+	if formatter == nil {
+		formatter = formatters.Fallback
+	}
+
+	// Tokenize and format
+	iterator, err := lexer.Tokenise(nil, jsonData)
+	if err != nil {
+		return jsonData // Return unformatted on error
+	}
+
+	var buf bytes.Buffer
+	err = formatter.Format(&buf, style, iterator)
+	if err != nil {
+		return jsonData // Return unformatted on error
+	}
+
+	return buf.String()
+}
+
 func (gui *Gui) refreshMainPanel() {
 	if gui.mainView == nil {
 		return
@@ -982,7 +1021,7 @@ func (gui *Gui) refreshMainPanel() {
 			if err != nil {
 				fmt.Fprintf(gui.mainView, "Error marshaling JSON: %v\n", err)
 			} else {
-				fmt.Fprint(gui.mainView, string(jsonData))
+				fmt.Fprint(gui.mainView, highlightJSON(string(jsonData)))
 			}
 		}
 	} else if selectedRG != nil && (activePanel == "resourcegroups" || activePanel == "resources") {
@@ -1008,7 +1047,7 @@ func (gui *Gui) refreshMainPanel() {
 			if err != nil {
 				fmt.Fprintf(gui.mainView, "Error marshaling JSON: %v\n", err)
 			} else {
-				fmt.Fprint(gui.mainView, string(jsonData))
+				fmt.Fprint(gui.mainView, highlightJSON(string(jsonData)))
 			}
 		}
 	} else if selectedSub != nil {
@@ -1027,7 +1066,7 @@ func (gui *Gui) refreshMainPanel() {
 			if err != nil {
 				fmt.Fprintf(gui.mainView, "Error marshaling JSON: %v\n", err)
 			} else {
-				fmt.Fprint(gui.mainView, string(jsonData))
+				fmt.Fprint(gui.mainView, highlightJSON(string(jsonData)))
 			}
 		}
 	}
