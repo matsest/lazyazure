@@ -918,6 +918,11 @@ func (gui *Gui) refreshMainPanel() {
 			if selectedRes.ChangedTime != "" {
 				fmt.Fprintf(gui.mainView, "Modified: %s\n", selectedRes.ChangedTime)
 			}
+			// Show hint at the top when browsing from list view (not in main panel)
+			if activePanel == "resources" {
+				fmt.Fprintln(gui.mainView, "\n[Press Enter to load full resource details]")
+				fmt.Fprintln(gui.mainView, "─────────────────────────────────────────")
+			}
 			if len(selectedRes.Tags) > 0 {
 				fmt.Fprintln(gui.mainView, "\nTags:")
 				for k, v := range selectedRes.Tags {
@@ -934,6 +939,11 @@ func (gui *Gui) refreshMainPanel() {
 		} else {
 			// JSON tab
 			gui.mainView.Title = " Details [JSON] "
+			// Show hint at the top when browsing from list view
+			if activePanel == "resources" {
+				fmt.Fprintln(gui.mainView, "// Press Enter to load full resource details with all properties")
+				fmt.Fprintln(gui.mainView, "")
+			}
 			jsonData, err := json.MarshalIndent(selectedRes, "", "  ")
 			if err != nil {
 				fmt.Fprintf(gui.mainView, "Error marshaling JSON: %v\n", err)
