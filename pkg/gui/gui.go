@@ -202,6 +202,9 @@ func (gui *Gui) setupViews() error {
 		v.Wrap = true
 		// Enable scrolling
 		v.Autoscroll = false
+		// Editable and focusable for scrolling, but no highlight (not a list)
+		v.Editable = false
+		v.Highlight = false
 		gui.mainView = v
 	}
 
@@ -660,11 +663,23 @@ func (gui *Gui) onResEnter(g *gocui.Gui, v *gocui.View) error {
 
 	if idx >= 0 && idx < len(gui.resources) {
 		selectedRes := gui.resources[idx]
+		// Set selectedRes immediately so basic info shows while loading
+		gui.selectedRes = selectedRes
 		gui.mu.Unlock()
 
-		// Load full resource details with provider-specific properties
-		// Pass the original resource to preserve createdTime/changedTime
+		// Refresh to show basic info immediately
+		gui.refreshMainPanel()
+
+		// Load full resource details asynchronously
 		gui.loadResourceDetails(selectedRes)
+
+		// Move focus to main panel to view the details
+		gui.g.SetCurrentView("main")
+		gui.mu.Lock()
+		gui.activePanel = "main"
+		gui.mu.Unlock()
+		gui.updatePanelTitles()
+		gui.updateStatus()
 	} else {
 		gui.mu.Unlock()
 	}
@@ -684,6 +699,8 @@ func (gui *Gui) switchPanel(g *gocui.Gui, v *gocui.View) error {
 	case "resourcegroups":
 		nextView = "resources"
 	case "resources":
+		nextView = "main"
+	case "main":
 		nextView = "subscriptions"
 	default:
 		nextView = "subscriptions"
@@ -716,6 +733,8 @@ func (gui *Gui) switchPanelReverse(g *gocui.Gui, v *gocui.View) error {
 	var nextView string
 	switch currentPanel {
 	case "subscriptions":
+		nextView = "main"
+	case "main":
 		nextView = "resources"
 	case "resources":
 		nextView = "resourcegroups"
@@ -817,6 +836,15 @@ func (gui *Gui) updatePanelTitles() {
 			gui.resourcesView.Title = "   Resources "
 		}
 	}
+
+	// Update main panel title to show when it's active
+	if gui.mainView != nil {
+		if activePanel == "main" {
+			gui.mainView.Title = " ▶ Details "
+		} else {
+			gui.mainView.Title = "   Details "
+		}
+	}
 }
 
 func (gui *Gui) refresh(g *gocui.Gui, v *gocui.View) error {
@@ -874,7 +902,7 @@ func (gui *Gui) refreshMainPanel() {
 	gui.mu.RUnlock()
 
 	// Determine what to display based on what's selected and active panel
-	if selectedRes != nil && activePanel == "resources" {
+	if selectedRes != nil && (activePanel == "resources" || activePanel == "main") {
 		// Show resource details
 		if tabIndex == 0 {
 			// Summary tab
@@ -982,6 +1010,8 @@ func (gui *Gui) updateStatus() {
 		status = fmt.Sprintf("↑↓: Navigate | Enter: Load Resources | Tab: Switch | []: Tabs | r: Refresh | q: Quit | RGs: %d", rgCount)
 	case "resources":
 		status = fmt.Sprintf("↑↓: Navigate | Enter: View Details | Tab: Switch | []: Tabs | r: Refresh | q: Quit | Resources: %d", resCount)
+	case "main":
+		status = fmt.Sprintf("↑/↓ or j/k: Scroll | PgUp/PgDn: Page | Tab: Back to List | []: Tabs | r: Refresh | q: Quit")
 	default:
 		status = fmt.Sprintf("↑↓: Navigate | Tab: Switch | r: Refresh | q: Quit")
 	}
@@ -1132,6 +1162,7 @@ func (gui *Gui) loadResourceDetails(originalRes *domain.Resource) {
 
 		gui.g.UpdateAsync(func(g *gocui.Gui) error {
 			gui.refreshMainPanel()
+			gui.updatePanelTitles() // Restore focus indicator
 			return nil
 		})
 	}()

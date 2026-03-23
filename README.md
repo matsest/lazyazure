@@ -42,11 +42,11 @@ go build .
 
 **Navigation:**
 - **↑ / ↓** or **j / k**: Navigate items in current panel
-- **Tab**: Switch focus forward between panels (Subscriptions → Resource Groups → Resources)
-- **Shift+Tab**: Switch focus backward between panels (Resources → Resource Groups → Subscriptions)
+- **Tab**: Switch focus forward between panels (Subscriptions → Resource Groups → Resources → Details)
+- **Shift+Tab**: Switch focus backward between panels (Details → Resources → Resource Groups → Subscriptions)
 - **Enter** (on subscription): Load resource groups for that subscription
 - **Enter** (on resource group): Load resources in that resource group
-- **Enter** (on resource): View resource details in right panel
+- **Enter** (on resource): View resource details and focus right panel
 
 **View Controls:**
 - **[ / ]**: Switch between Summary and JSON tabs
