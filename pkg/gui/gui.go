@@ -998,11 +998,6 @@ func (gui *Gui) refreshMainPanel() {
 			if selectedRes.ChangedTime != "" {
 				printKeyValue(gui.mainView, "Modified", selectedRes.ChangedTime)
 			}
-			// Show hint at the top when browsing from list view (not in main panel)
-			if activePanel == "resources" {
-				fmt.Fprintln(gui.mainView, "\n[Press Enter to load full resource details]")
-				fmt.Fprintln(gui.mainView, "─────────────────────────────────────────")
-			}
 			if len(selectedRes.Tags) > 0 {
 				fmt.Fprintln(gui.mainView, "")
 				printKeyValue(gui.mainView, "Tags", "")
@@ -1017,6 +1012,12 @@ func (gui *Gui) refreshMainPanel() {
 				for k, v := range selectedRes.Properties {
 					printKeyValue(gui.mainView, "  "+k, fmt.Sprintf("%v", v))
 				}
+			}
+			// Show hint at the bottom when browsing from list view (not in main panel)
+			if activePanel == "resources" {
+				fmt.Fprintln(gui.mainView, "")
+				fmt.Fprintln(gui.mainView, "─────────────────────────────────────────")
+				fmt.Fprintln(gui.mainView, "[Press Enter to load full resource details]")
 			}
 		} else {
 			// JSON tab
