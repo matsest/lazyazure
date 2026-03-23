@@ -132,6 +132,7 @@ az login  # Optional - only one of many auth methods
 - Always use context with timeout: `context.WithTimeout(ctx, 30*time.Second)`
 - Run API calls in goroutines to keep UI responsive
 - Handle errors gracefully with user-friendly messages
+- Cache API versions for resource providers to avoid repeated lookups
 
 ### 6. Testing
 
@@ -236,6 +237,37 @@ Before finishing a session:
 3. **Test in real terminal**: IDE consoles don't work properly for TUI apps
 4. **Ghostty**: Preferred terminal for testing
 5. **Debug logs are essential**: But must be opt-in for production
+
+### 11. UI Styling and Formatting
+
+#### ANSI Colors in gocui
+- gocui supports ANSI escape codes for colored text in views
+- Use 256-color palette for precise color matching: `\x1b[38;5;114m` (color 114)
+- Combine with bold: `\x1b[1;38;5;114m` for bold + color
+- Always reset after color: `\x1b[0m`
+
+#### Chroma for JSON Syntax Highlighting
+- Use `terminal256` formatter for full color support (not `terminal`)
+- github-dark theme works well for dark terminals with green keys
+- Some themes (like github-dark) need 256-color support to render properly
+- Post-process output to add bold: replace `[38;5;114m` with `[1;38;5;114m`
+
+#### Consistent Styling Between Views
+- Keep colors consistent between Summary and JSON tabs
+- Use same color codes in both manual formatting (Summary) and Chroma (JSON)
+- Test both views side-by-side to ensure visual consistency
+
+#### Formatting Nested Data
+- Don't use `fmt.Sprintf("%v", value)` for maps/arrays (shows ugly Go syntax)
+- Implement recursive formatting for nested structures
+- Use indentation to show hierarchy
+- Example: `formatPropertyValue()` for maps with nested key-value pairs
+
+#### Sorting for Consistent UI
+- Map iteration order is random in Go
+- Sort keys alphabetically for consistent display: `sort.Strings(keys)`
+- Apply to tags, properties, or any map data shown in UI
+- Prevents "shuffle" effect when navigating between items
 
 ## Questions to Ask User
 
