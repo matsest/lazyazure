@@ -319,7 +319,11 @@ func (gui *Gui) refreshAuthPanel() {
 	if user != nil {
 		// Display user information
 		fmt.Fprintf(gui.authView, "Name:  %s\n", user.DisplayName)
-		fmt.Fprintf(gui.authView, "UPN:   %s\n", user.UserPrincipalName)
+		// Only show UPN for service principals, not for regular users
+		// (since users authenticated via some methods don't have UPN in the token)
+		if user.Type == "serviceprincipal" {
+			fmt.Fprintf(gui.authView, "AppID: %s\n", user.UserPrincipalName)
+		}
 		fmt.Fprintf(gui.authView, "Type:  %s", user.Type)
 	} else {
 		fmt.Fprint(gui.authView, "Authenticating...")

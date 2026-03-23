@@ -2,14 +2,17 @@ package azure
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"os/exec"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/matsest/lazyazure/pkg/domain"
+	"github.com/matsest/lazyazure/pkg/utils"
 )
 
 // Client wraps Azure SDK clients and provides high-level operations
@@ -39,65 +42,158 @@ func NewClient() (*Client, error) {
 	}, nil
 }
 
-// GetUserInfo retrieves information about the currently authenticated user using Azure CLI
+// azureTokenClaims represents the claims we expect in an Azure access token
+type azureTokenClaims struct {
+	TenantID          string `json:"tid"`
+	ObjectID          string `json:"oid"`
+	UserPrincipalName string `json:"upn"`
+	PreferredUsername string `json:"preferred_username"`
+	AppID             string `json:"appid"` // v1.0 tokens
+	Azp               string `json:"azp"`   // v2.0 tokens (replaces appid)
+	Name              string `json:"name"`
+	IdentityProvider  string `json:"idp"`
+	Audience          string `json:"aud"`
+	Issuer            string `json:"iss"`
+}
+
+// GetUserInfo retrieves information about the currently authenticated user
+// by parsing the access token JWT. This works with any authentication method
+// supported by DefaultAzureCredential.
 func (c *Client) GetUserInfo(ctx context.Context) (*domain.User, error) {
-	// First verify we can get a token
-	_, err := c.credential.GetToken(ctx, policy.TokenRequestOptions{
+	// Get access token from the credential
+	tokenResponse, err := c.credential.GetToken(ctx, policy.TokenRequestOptions{
 		Scopes: []string{"https://management.azure.com/.default"},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to authenticate - ensure you're logged in with 'az login': %w", err)
+		return nil, fmt.Errorf("failed to authenticate: %w", err)
 	}
 
-	// Use az account show to get user information
-	cmd := exec.CommandContext(ctx, "az", "account", "show", "-o", "json")
-	output, err := cmd.Output()
+	// Parse the JWT token to extract claims
+	claims, err := parseAzureToken(tokenResponse.Token)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get account info from Azure CLI: %w", err)
+		return nil, fmt.Errorf("failed to parse access token: %w", err)
 	}
 
-	var accountInfo struct {
-		User struct {
-			Name string `json:"name"`
-			Type string `json:"type"`
-		} `json:"user"`
-		TenantID string `json:"tenantId"`
-	}
-
-	if err := json.Unmarshal(output, &accountInfo); err != nil {
-		return nil, fmt.Errorf("failed to parse account info: %w", err)
-	}
+	// Debug logging to see what claims are present
+	utils.Log("GetUserInfo: Token claims - tid=%s, oid=%s, upn=%s, preferred_username=%s, appid=%s, azp=%s, name=%s",
+		claims.TenantID, claims.ObjectID, claims.UserPrincipalName, claims.PreferredUsername,
+		claims.AppID, claims.Azp, claims.Name)
 
 	user := &domain.User{
-		TenantID: accountInfo.TenantID,
+		TenantID: claims.TenantID,
 	}
 
-	// Map Azure CLI user type to our format
-	switch accountInfo.User.Type {
-	case "servicePrincipal":
-		user.Type = "serviceprincipal"
-		user.UserPrincipalName = accountInfo.User.Name // For SPs, this is the appId
-		user.DisplayName = accountInfo.User.Name       // For SPs, use appId as display name
-	default:
-		user.Type = "user"
-		user.UserPrincipalName = accountInfo.User.Name // For users, this is the UPN/email
+	// Determine if this is a service principal or user
+	// Users have upn, preferred_username, or name claims (the name claim indicates a user identity)
+	// Service principals don't have user identity claims but have appid/azp
+	hasUserIdentity := claims.UserPrincipalName != "" || claims.PreferredUsername != "" || claims.Name != ""
 
-		// Try to get display name from Microsoft Graph via Azure CLI
-		// This may fail if user doesn't have Graph permissions, so we fall back to UPN
-		user.DisplayName = user.UserPrincipalName
-		cmd2 := exec.CommandContext(ctx, "az", "ad", "signed-in-user", "show", "-o", "json")
-		output2, err := cmd2.Output()
-		if err == nil {
-			var userInfo struct {
-				DisplayName string `json:"displayName"`
-			}
-			if err := json.Unmarshal(output2, &userInfo); err == nil && userInfo.DisplayName != "" {
-				user.DisplayName = userInfo.DisplayName
-			}
+	utils.Log("GetUserInfo: hasUserIdentity=%v", hasUserIdentity)
+
+	if !hasUserIdentity && (claims.AppID != "" || claims.Azp != "") {
+		// Service Principal acting on its own (app-only token)
+		user.Type = "serviceprincipal"
+		// Use appid if available, otherwise azp
+		appId := claims.AppID
+		if appId == "" {
+			appId = claims.Azp
 		}
+		user.UserPrincipalName = appId
+		user.DisplayName = appId
+		utils.Log("GetUserInfo: Detected as Service Principal, appId=%s", appId)
+	} else {
+		// Regular user (delegated token)
+		user.Type = "user"
+
+		// Use UPN if available, otherwise preferred_username, otherwise object ID
+		if claims.UserPrincipalName != "" {
+			user.UserPrincipalName = claims.UserPrincipalName
+		} else if claims.PreferredUsername != "" {
+			user.UserPrincipalName = claims.PreferredUsername
+		} else if claims.ObjectID != "" {
+			// Fallback to object ID if no username available
+			user.UserPrincipalName = claims.ObjectID
+		}
+
+		// Use name claim for display name if available, otherwise fall back to UPN
+		if claims.Name != "" {
+			user.DisplayName = claims.Name
+		} else {
+			user.DisplayName = user.UserPrincipalName
+		}
+		utils.Log("GetUserInfo: Detected as User, UPN=%s, DisplayName=%s", user.UserPrincipalName, user.DisplayName)
 	}
 
 	return user, nil
+}
+
+// parseAzureToken parses an Azure access token JWT and extracts the claims.
+// The token is not verified as it comes from the trusted Azure SDK.
+func parseAzureToken(tokenString string) (*azureTokenClaims, error) {
+	// Try parsing with jwt library first
+	token, _, err := new(jwt.Parser).ParseUnverified(tokenString, jwt.MapClaims{})
+	if err == nil {
+		if claims, ok := token.Claims.(jwt.MapClaims); ok {
+			return mapClaimsToAzureClaims(claims), nil
+		}
+	}
+
+	// Fallback: manual JWT parsing if jwt library fails
+	parts := strings.Split(tokenString, ".")
+	if len(parts) != 3 {
+		return nil, fmt.Errorf("invalid JWT format: expected 3 parts, got %d", len(parts))
+	}
+
+	// Decode the payload (second part)
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode JWT payload: %w", err)
+	}
+
+	var claims azureTokenClaims
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return nil, fmt.Errorf("failed to parse JWT claims: %w", err)
+	}
+
+	return &claims, nil
+}
+
+// mapClaimsToAzureClaims converts jwt.MapClaims to azureTokenClaims
+func mapClaimsToAzureClaims(mapClaims jwt.MapClaims) *azureTokenClaims {
+	claims := &azureTokenClaims{}
+
+	if v, ok := mapClaims["tid"].(string); ok {
+		claims.TenantID = v
+	}
+	if v, ok := mapClaims["oid"].(string); ok {
+		claims.ObjectID = v
+	}
+	if v, ok := mapClaims["upn"].(string); ok {
+		claims.UserPrincipalName = v
+	}
+	if v, ok := mapClaims["preferred_username"].(string); ok {
+		claims.PreferredUsername = v
+	}
+	if v, ok := mapClaims["appid"].(string); ok {
+		claims.AppID = v
+	}
+	if v, ok := mapClaims["azp"].(string); ok {
+		claims.Azp = v
+	}
+	if v, ok := mapClaims["name"].(string); ok {
+		claims.Name = v
+	}
+	if v, ok := mapClaims["idp"].(string); ok {
+		claims.IdentityProvider = v
+	}
+	if v, ok := mapClaims["aud"].(string); ok {
+		claims.Audience = v
+	}
+	if v, ok := mapClaims["iss"].(string); ok {
+		claims.Issuer = v
+	}
+
+	return claims
 }
 
 // VerifyAuthentication checks if the client can authenticate

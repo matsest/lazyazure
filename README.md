@@ -19,8 +19,11 @@ See `PLAN.md` for implementation details and roadmap.
 
 ### Prerequisites
 
-- Azure CLI installed and authenticated (`az login`)
+- Azure account with appropriate permissions
 - Go 1.26.1+ installed
+
+Optional:
+- Azure CLI installed (for `az login` convenience method)
 
 ### Building
 
@@ -51,14 +54,33 @@ go build .
 
 ## Authentication
 
-LazyAzure uses Azure's `DefaultAzureCredential` which automatically:
-1. Checks environment variables
-2. Checks for managed identity
-3. Falls back to Azure CLI credentials (primary method for this app)
+LazyAzure uses Azure's `DefaultAzureCredential` which supports multiple authentication methods:
 
-To authenticate:
+1. **Environment Variables** - Set `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, and `AZURE_TENANT_ID`
+2. **Managed Identity** - Automatic authentication when running in Azure (VMs, containers, etc.)
+3. **Azure CLI** - Run `az login` (convenient for local development)
+4. **Azure PowerShell** - Uses PowerShell credentials if available
+5. **Visual Studio Code** - Uses VS Code Azure extension credentials
+6. **Azure Developer CLI** - Uses `azd` credentials
+
+### Quick Start with Azure CLI
+
+The easiest way to authenticate for local development:
+
 ```bash
 az login
+./lazyazure
+```
+
+### Using Environment Variables
+
+For automation or CI/CD pipelines:
+
+```bash
+export AZURE_CLIENT_ID="your-client-id"
+export AZURE_CLIENT_SECRET="your-client-secret"
+export AZURE_TENANT_ID="your-tenant-id"
+./lazyazure
 ```
 
 ## Debug Logging
