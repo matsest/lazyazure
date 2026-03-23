@@ -155,7 +155,7 @@ func (gui *Gui) setupViews() error {
 		v.Title = " Subscriptions "
 		v.Highlight = true
 		v.SelBgColor = gocui.ColorBlue
-		v.SelFgColor = gocui.ColorWhite
+		v.SelFgColor = gocui.ColorWhite | gocui.AttrBold
 		gui.subscriptionsView = v
 		// Set as current view initially
 		gui.g.SetCurrentView("subscriptions")
@@ -171,7 +171,7 @@ func (gui *Gui) setupViews() error {
 		v.Title = " Resource Groups "
 		v.Highlight = true
 		v.SelBgColor = gocui.ColorBlue
-		v.SelFgColor = gocui.ColorWhite
+		v.SelFgColor = gocui.ColorWhite | gocui.AttrBold
 		gui.resourceGroupsView = v
 	}
 
@@ -189,7 +189,7 @@ func (gui *Gui) setupViews() error {
 		v.Title = " Resources "
 		v.Highlight = true
 		v.SelBgColor = gocui.ColorBlue
-		v.SelFgColor = gocui.ColorWhite
+		v.SelFgColor = gocui.ColorWhite | gocui.AttrBold
 		gui.resourcesView = v
 	}
 
