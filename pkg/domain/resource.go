@@ -2,16 +2,16 @@ package domain
 
 // Resource represents a generic Azure resource
 type Resource struct {
-	ID             string
-	Name           string
-	Type           string
-	Location       string
-	ResourceGroup  string
-	SubscriptionID string
-	Tags           map[string]string
-	Properties     map[string]interface{} // Additional properties for details view
-	CreatedTime    string                 // Resource creation time
-	ChangedTime    string                 // Last modified time
+	ID             string                 `json:"id"`
+	Name           string                 `json:"name"`
+	Type           string                 `json:"type"`
+	Location       string                 `json:"location"`
+	ResourceGroup  string                 `json:"resourceGroup"`
+	SubscriptionID string                 `json:"subscriptionId"`
+	Tags           map[string]string      `json:"tags"`
+	Properties     map[string]interface{} `json:"properties"`  // Additional properties for details view
+	CreatedTime    string                 `json:"createdTime"` // Resource creation time
+	ChangedTime    string                 `json:"changedTime"` // Last modified time
 }
 
 // DisplayString returns a string representation for the UI

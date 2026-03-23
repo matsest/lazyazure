@@ -2,12 +2,12 @@ package domain
 
 // ResourceGroup represents an Azure resource group
 type ResourceGroup struct {
-	Name              string
-	Location          string
-	ID                string
-	ProvisioningState string
-	Tags              map[string]string
-	SubscriptionID    string
+	Name              string            `json:"name"`
+	Location          string            `json:"location"`
+	ID                string            `json:"id"`
+	ProvisioningState string            `json:"provisioningState"`
+	Tags              map[string]string `json:"tags"`
+	SubscriptionID    string            `json:"subscriptionId"`
 }
 
 // DisplayString returns a string representation for the UI

@@ -2,10 +2,10 @@ package domain
 
 // Subscription represents an Azure subscription
 type Subscription struct {
-	ID       string
-	Name     string
-	State    string
-	TenantID string
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	State    string `json:"state"`
+	TenantID string `json:"tenantId"`
 }
 
 // DisplayString returns a string representation for the UI
