@@ -909,6 +909,18 @@ func (gui *Gui) nextTab(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+// ANSI color codes
+const (
+	colorCyan  = "\x1b[36m"
+	colorWhite = "\x1b[37m"
+	colorReset = "\x1b[0m"
+)
+
+// printKeyValue prints a key-value pair with cyan key and white value
+func printKeyValue(view *gocui.View, key string, value string) {
+	fmt.Fprintf(view, "%s%s:%s %s\n", colorCyan, key, colorReset, value)
+}
+
 func (gui *Gui) refreshMainPanel() {
 	if gui.mainView == nil {
 		return
@@ -929,16 +941,16 @@ func (gui *Gui) refreshMainPanel() {
 		if tabIndex == 0 {
 			// Summary tab
 			gui.mainView.Title = " Details [Summary] "
-			fmt.Fprintf(gui.mainView, "Name: %s\n", selectedRes.Name)
-			fmt.Fprintf(gui.mainView, "Type: %s\n", selectedRes.Type)
-			fmt.Fprintf(gui.mainView, "Location: %s\n", selectedRes.Location)
-			fmt.Fprintf(gui.mainView, "ID: %s\n", selectedRes.ID)
-			fmt.Fprintf(gui.mainView, "Resource Group: %s\n", selectedRes.ResourceGroup)
+			printKeyValue(gui.mainView, "Name", selectedRes.Name)
+			printKeyValue(gui.mainView, "Type", selectedRes.Type)
+			printKeyValue(gui.mainView, "Location", selectedRes.Location)
+			printKeyValue(gui.mainView, "ID", selectedRes.ID)
+			printKeyValue(gui.mainView, "Resource Group", selectedRes.ResourceGroup)
 			if selectedRes.CreatedTime != "" {
-				fmt.Fprintf(gui.mainView, "Created: %s\n", selectedRes.CreatedTime)
+				printKeyValue(gui.mainView, "Created", selectedRes.CreatedTime)
 			}
 			if selectedRes.ChangedTime != "" {
-				fmt.Fprintf(gui.mainView, "Modified: %s\n", selectedRes.ChangedTime)
+				printKeyValue(gui.mainView, "Modified", selectedRes.ChangedTime)
 			}
 			// Show hint at the top when browsing from list view (not in main panel)
 			if activePanel == "resources" {
@@ -948,14 +960,14 @@ func (gui *Gui) refreshMainPanel() {
 			if len(selectedRes.Tags) > 0 {
 				fmt.Fprintln(gui.mainView, "\nTags:")
 				for k, v := range selectedRes.Tags {
-					fmt.Fprintf(gui.mainView, "  %s: %s\n", k, v)
+					printKeyValue(gui.mainView, "  "+k, v)
 				}
 			}
 			// Show resource properties if available
 			if len(selectedRes.Properties) > 0 {
 				fmt.Fprintln(gui.mainView, "\nProperties:")
 				for k, v := range selectedRes.Properties {
-					fmt.Fprintf(gui.mainView, "  %s: %v\n", k, v)
+					printKeyValue(gui.mainView, "  "+k, fmt.Sprintf("%v", v))
 				}
 			}
 		} else {
@@ -978,15 +990,15 @@ func (gui *Gui) refreshMainPanel() {
 		if tabIndex == 0 {
 			// Summary tab
 			gui.mainView.Title = " Details [Summary] "
-			fmt.Fprintf(gui.mainView, "Name: %s\n", selectedRG.Name)
-			fmt.Fprintf(gui.mainView, "Location: %s\n", selectedRG.Location)
-			fmt.Fprintf(gui.mainView, "Subscription ID: %s\n", selectedRG.SubscriptionID)
-			fmt.Fprintf(gui.mainView, "ID: %s\n", selectedRG.ID)
-			fmt.Fprintf(gui.mainView, "Provisioning State: %s\n", selectedRG.ProvisioningState)
+			printKeyValue(gui.mainView, "Name", selectedRG.Name)
+			printKeyValue(gui.mainView, "Location", selectedRG.Location)
+			printKeyValue(gui.mainView, "Subscription ID", selectedRG.SubscriptionID)
+			printKeyValue(gui.mainView, "ID", selectedRG.ID)
+			printKeyValue(gui.mainView, "Provisioning State", selectedRG.ProvisioningState)
 			if len(selectedRG.Tags) > 0 {
 				fmt.Fprintln(gui.mainView, "\nTags:")
 				for k, v := range selectedRG.Tags {
-					fmt.Fprintf(gui.mainView, "  %s: %s\n", k, v)
+					printKeyValue(gui.mainView, "  "+k, v)
 				}
 			}
 		} else {
@@ -1004,10 +1016,10 @@ func (gui *Gui) refreshMainPanel() {
 		if tabIndex == 0 {
 			// Summary tab
 			gui.mainView.Title = " Details [Summary] "
-			fmt.Fprintf(gui.mainView, "Name: %s\n", selectedSub.Name)
-			fmt.Fprintf(gui.mainView, "ID: %s\n", selectedSub.ID)
-			fmt.Fprintf(gui.mainView, "State: %s\n", selectedSub.State)
-			fmt.Fprintf(gui.mainView, "Tenant ID: %s\n", selectedSub.TenantID)
+			printKeyValue(gui.mainView, "Name", selectedSub.Name)
+			printKeyValue(gui.mainView, "ID", selectedSub.ID)
+			printKeyValue(gui.mainView, "State", selectedSub.State)
+			printKeyValue(gui.mainView, "Tenant ID", selectedSub.TenantID)
 		} else {
 			// JSON tab
 			gui.mainView.Title = " Details [JSON] "
