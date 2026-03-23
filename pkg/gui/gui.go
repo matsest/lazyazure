@@ -1004,14 +1004,16 @@ func (gui *Gui) refreshMainPanel() {
 				fmt.Fprintln(gui.mainView, "─────────────────────────────────────────")
 			}
 			if len(selectedRes.Tags) > 0 {
-				fmt.Fprintln(gui.mainView, "\nTags:")
+				fmt.Fprintln(gui.mainView, "")
+				printKeyValue(gui.mainView, "Tags", "")
 				for k, v := range selectedRes.Tags {
 					printKeyValue(gui.mainView, "  "+k, v)
 				}
 			}
 			// Show resource properties if available
 			if len(selectedRes.Properties) > 0 {
-				fmt.Fprintln(gui.mainView, "\nProperties:")
+				fmt.Fprintln(gui.mainView, "")
+				printKeyValue(gui.mainView, "Properties", "")
 				for k, v := range selectedRes.Properties {
 					printKeyValue(gui.mainView, "  "+k, fmt.Sprintf("%v", v))
 				}
@@ -1042,7 +1044,8 @@ func (gui *Gui) refreshMainPanel() {
 			printKeyValue(gui.mainView, "ID", selectedRG.ID)
 			printKeyValue(gui.mainView, "Provisioning State", selectedRG.ProvisioningState)
 			if len(selectedRG.Tags) > 0 {
-				fmt.Fprintln(gui.mainView, "\nTags:")
+				fmt.Fprintln(gui.mainView, "")
+				printKeyValue(gui.mainView, "Tags", "")
 				for k, v := range selectedRG.Tags {
 					printKeyValue(gui.mainView, "  "+k, v)
 				}
