@@ -77,6 +77,10 @@ func (gui *Gui) Run() error {
 	gui.g = g
 	utils.Log("Gui.Run: gocui created successfully")
 
+	// Set up color scheme (green border for active/focused elements)
+	gui.g.SelFgColor = gocui.ColorGreen
+	gui.g.SelFrameColor = gocui.ColorGreen
+
 	// Set up initial layout
 	utils.Log("Gui.Run: Setting up views...")
 	if err := gui.setupViews(); err != nil {
@@ -142,6 +146,8 @@ func (gui *Gui) setupViews() error {
 		}
 		v.Title = " Auth "
 		v.Wrap = true
+		v.Frame = true
+		v.FrameColor = gocui.ColorWhite
 		gui.authView = v
 	}
 
@@ -156,6 +162,8 @@ func (gui *Gui) setupViews() error {
 		v.Highlight = true
 		v.SelBgColor = gocui.ColorBlue
 		v.SelFgColor = gocui.ColorWhite | gocui.AttrBold
+		v.Frame = true
+		v.FrameColor = gocui.ColorWhite
 		gui.subscriptionsView = v
 		// Set as current view initially
 		gui.g.SetCurrentView("subscriptions")
@@ -172,6 +180,8 @@ func (gui *Gui) setupViews() error {
 		v.Highlight = true
 		v.SelBgColor = gocui.ColorBlue
 		v.SelFgColor = gocui.ColorWhite | gocui.AttrBold
+		v.Frame = true
+		v.FrameColor = gocui.ColorWhite
 		gui.resourceGroupsView = v
 	}
 
@@ -190,6 +200,8 @@ func (gui *Gui) setupViews() error {
 		v.Highlight = true
 		v.SelBgColor = gocui.ColorBlue
 		v.SelFgColor = gocui.ColorWhite | gocui.AttrBold
+		v.Frame = true
+		v.FrameColor = gocui.ColorWhite
 		gui.resourcesView = v
 	}
 
@@ -205,6 +217,8 @@ func (gui *Gui) setupViews() error {
 		// Editable and focusable for scrolling, but no highlight (not a list)
 		v.Editable = false
 		v.Highlight = false
+		v.Frame = true
+		v.FrameColor = gocui.ColorWhite
 		gui.mainView = v
 	}
 
@@ -812,37 +826,45 @@ func (gui *Gui) updatePanelTitles() {
 	activePanel := gui.activePanel
 	gui.mu.RUnlock()
 
-	// Update titles to show which panel is active
+	// Update titles and frame colors to show which panel is active
 	if gui.subscriptionsView != nil {
 		if activePanel == "subscriptions" {
 			gui.subscriptionsView.Title = " ▶ Subscriptions "
+			gui.subscriptionsView.FrameColor = gocui.ColorGreen
 		} else {
 			gui.subscriptionsView.Title = "   Subscriptions "
+			gui.subscriptionsView.FrameColor = gocui.ColorWhite
 		}
 	}
 
 	if gui.resourceGroupsView != nil {
 		if activePanel == "resourcegroups" {
 			gui.resourceGroupsView.Title = " ▶ Resource Groups "
+			gui.resourceGroupsView.FrameColor = gocui.ColorGreen
 		} else {
 			gui.resourceGroupsView.Title = "   Resource Groups "
+			gui.resourceGroupsView.FrameColor = gocui.ColorWhite
 		}
 	}
 
 	if gui.resourcesView != nil {
 		if activePanel == "resources" {
 			gui.resourcesView.Title = " ▶ Resources "
+			gui.resourcesView.FrameColor = gocui.ColorGreen
 		} else {
 			gui.resourcesView.Title = "   Resources "
+			gui.resourcesView.FrameColor = gocui.ColorWhite
 		}
 	}
 
-	// Update main panel title to show when it's active
+	// Update main panel title and frame color
 	if gui.mainView != nil {
 		if activePanel == "main" {
 			gui.mainView.Title = " ▶ Details "
+			gui.mainView.FrameColor = gocui.ColorGreen
 		} else {
 			gui.mainView.Title = "   Details "
+			gui.mainView.FrameColor = gocui.ColorWhite
 		}
 	}
 }
