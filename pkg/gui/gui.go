@@ -927,6 +927,27 @@ func printKeyValue(view *gocui.View, key string, value string) {
 	fmt.Fprintf(view, "%s%s:%s %s\n", colorBoldKey, key, colorReset, value)
 }
 
+// formatPropertyValue formats a property value, handling nested maps properly
+func formatPropertyValue(view *gocui.View, key string, value interface{}, indent string) {
+	switch v := value.(type) {
+	case map[string]interface{}:
+		// For maps, print the key and then recurse into the nested values
+		fmt.Fprintf(view, "%s%s%s:%s\n", colorBoldKey, indent+key, colorReset, "")
+		for nestedKey, nestedValue := range v {
+			formatPropertyValue(view, nestedKey, nestedValue, indent+"  ")
+		}
+	case []interface{}:
+		// For arrays, print the key and then each item
+		fmt.Fprintf(view, "%s%s%s:%s\n", colorBoldKey, indent+key, colorReset, "")
+		for i, item := range v {
+			formatPropertyValue(view, fmt.Sprintf("[%d]", i), item, indent+"  ")
+		}
+	default:
+		// For simple values, print key-value pair
+		fmt.Fprintf(view, "%s%s%s:%s %v\n", colorBoldKey, indent+key, colorReset, "", v)
+	}
+}
+
 // highlightJSON uses Chroma to syntax highlight JSON output with bold keys
 func highlightJSON(jsonData string) string {
 	// Use the JSON lexer
@@ -1010,7 +1031,7 @@ func (gui *Gui) refreshMainPanel() {
 				fmt.Fprintln(gui.mainView, "")
 				printKeyValue(gui.mainView, "Properties", "")
 				for k, v := range selectedRes.Properties {
-					printKeyValue(gui.mainView, "  "+k, fmt.Sprintf("%v", v))
+					formatPropertyValue(gui.mainView, k, v, "  ")
 				}
 			}
 			// Show hint at the bottom when browsing from list view (not in main panel)
