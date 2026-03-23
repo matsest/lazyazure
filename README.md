@@ -6,17 +6,22 @@ A TUI application for Azure resource management, inspired by lazydocker. Browse 
 
 ## Features
 
-- Browse Azure subscriptions, resource groups, and resources
-- Full hierarchy navigation: Subscriptions → Resource Groups → Resources
-- View resource details in Summary or JSON format  
-- Interactive terminal interface with keyboard-driven navigation
-- Stackable panels showing all hierarchy levels simultaneously
-- Visual focus indicators for easy navigation
-- Clean, focused UI inspired by lazydocker
+- **Full Resource Hierarchy**: Browse Subscriptions → Resource Groups → Resources
+- **Multiple Authentication Methods**: Supports Azure CLI, Managed Identity, Environment Variables, and more
+- **Rich Detail Views**: 
+  - Summary view with color-coded keys and formatted nested properties
+  - JSON view with syntax highlighting
+  - Scrollable content for long resource details
+- **Intuitive Navigation**: 
+  - Tab/Shift+Tab to cycle between panels
+  - Enter to drill down hierarchy
+  - Visual focus indicators (green border on active panel)
+- **Smart Resource Loading**: Fetches full resource details with provider-specific API versions
+- **Real-time Updates**: Refresh data without restarting the application
 
 See `PLAN.md` for implementation details and roadmap.
 
-## Usage
+## Installation
 
 ### Prerequisites
 
@@ -26,17 +31,39 @@ See `PLAN.md` for implementation details and roadmap.
 Optional:
 - Azure CLI installed (for `az login` convenience method)
 
-### Building
+### Install from Source
 
 ```bash
+go install github.com/matsest/lazyazure@latest
+```
+
+Or clone and build:
+
+```bash
+git clone https://github.com/matsest/lazyazure.git
+cd lazyazure
 go build .
 ```
 
-### Running
+## Usage
 
-```bash
-./lazyazure
-```
+### Quick Start
+
+1. **Authenticate** (choose one method):
+   ```bash
+   # Option A: Azure CLI (easiest for local development)
+   az login
+   
+   # Option B: Environment variables
+   export AZURE_CLIENT_ID="your-client-id"
+   export AZURE_CLIENT_SECRET="your-client-secret"
+   export AZURE_TENANT_ID="your-tenant-id"
+   ```
+
+2. **Run lazyazure**:
+   ```bash
+   ./lazyazure
+   ```
 
 ### Controls
 
@@ -50,6 +77,8 @@ go build .
 
 **View Controls:**
 - **[ / ]**: Switch between Summary and JSON tabs
+  - Summary: Color-coded keys (green) with formatted values
+  - JSON: Syntax highlighted with proper formatting
 - **↑ / ↓** or **j / k** (in details panel): Scroll content up/down
 - **PgUp / PgDn**: Scroll content by page
 - **r**: Refresh current data
@@ -59,7 +88,7 @@ go build .
 
 ## Authentication
 
-LazyAzure uses Azure's `DefaultAzureCredential` which supports multiple authentication methods:
+LazyAzure uses Azure's `DefaultAzureCredential` which automatically tries multiple authentication methods in order:
 
 1. **Environment Variables** - Set `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, and `AZURE_TENANT_ID`
 2. **Managed Identity** - Automatic authentication when running in Azure (VMs, containers, etc.)
@@ -68,25 +97,7 @@ LazyAzure uses Azure's `DefaultAzureCredential` which supports multiple authenti
 5. **Visual Studio Code** - Uses VS Code Azure extension credentials
 6. **Azure Developer CLI** - Uses `azd` credentials
 
-### Quick Start with Azure CLI
-
-The easiest way to authenticate for local development:
-
-```bash
-az login
-./lazyazure
-```
-
-### Using Environment Variables
-
-For automation or CI/CD pipelines:
-
-```bash
-export AZURE_CLIENT_ID="your-client-id"
-export AZURE_CLIENT_SECRET="your-client-secret"
-export AZURE_TENANT_ID="your-tenant-id"
-./lazyazure
-```
+For most users, simply run `az login` before starting lazyazure.
 
 ## Debug Logging
 
@@ -142,11 +153,12 @@ See `PLAN.md` for the full implementation roadmap.
 ## Dependencies
 
 - [gocui](https://github.com/jesseduffield/gocui) - TUI framework
+- [Chroma](https://github.com/alecthomas/chroma) - Syntax highlighting for JSON
 - Azure SDK for Go:
   - `azidentity` - Authentication
   - `azcore` - Core types
   - `armsubscriptions` - Subscription management
-  - `armresources` - Resource group management
+  - `armresources` - Resource management
 
 ## License
 
