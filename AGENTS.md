@@ -7,7 +7,7 @@ This document provides guidelines and lessons learned for agents working on the 
 LazyAzure is a TUI (Terminal User Interface) application for Azure resource management, inspired by lazydocker. It uses:
 - **gocui** for the terminal interface
 - **Azure SDK for Go** for Azure API interactions
-- **DefaultAzureCredential** for authentication (relies on Azure CLI)
+- **DefaultAzureCredential** for authentication (supports multiple auth methods)
 
 ## Critical Guidelines
 
@@ -111,10 +111,22 @@ The UI uses a fixed layout:
 ### 5. Azure SDK Patterns
 
 #### Authentication
+
+LazyAzure uses `DefaultAzureCredential` which automatically tries multiple authentication methods in order:
+
+1. Environment variables (`AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID`)
+2. Managed Identity (for apps running in Azure)
+3. Azure CLI (`az login`)
+4. Azure PowerShell
+5. Visual Studio Code credentials
+6. Azure Developer CLI (`azd`)
+
 ```go
-// Uses DefaultAzureCredential - requires Azure CLI login first
-az login  # Must be done before running lazyazure
+// Uses DefaultAzureCredential - tries multiple auth methods automatically
+az login  # Optional - only one of many auth methods
 ```
+
+**Implementation note:** User info is extracted by parsing the access token JWT claims (tid, oid, upn, name, appid, azp) rather than relying on Azure CLI commands. This allows the auth panel to display user information regardless of which authentication method is used.
 
 #### API Calls
 - Always use context with timeout: `context.WithTimeout(ctx, 30*time.Second)`

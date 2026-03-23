@@ -197,7 +197,7 @@ lazyazure/
 ## Key Technical Decisions
 
 1. **TUI Library**: `gocui` - Same as lazydocker, proven, battle-tested
-2. **Azure Auth**: `DefaultAzureCredential` - Seamlessly uses Azure CLI auth
+2. **Azure Auth**: `DefaultAzureCredential` - Supports multiple auth methods (CLI, env vars, managed identity, etc.)
 3. **Generic Panels**: Go generics for type-safe, reusable UI components
 4. **Async Tasks**: Background loading to keep UI responsive
 5. **Layout**: Box-based responsive layout system from lazycore
@@ -206,12 +206,12 @@ lazyazure/
 
 ## MVP Success Criteria
 
-- [x] User can launch and see current Azure CLI identity
+- [x] User can launch and see current Azure identity
 - [x] Left panel shows list of subscriptions (name, ID)
 - [x] Can navigate subscriptions with arrow keys
 - [x] Right panel shows subscription details in JSON and summary tabs
 - [x] Can switch tabs with `[` and `]`
-- [x] App gracefully handles Azure CLI not being logged in
+- [x] App gracefully handles authentication failures
 - [x] Clean exit with `q` or `Ctrl+C`
 - [x] Navigate to resource groups within subscriptions
 - [x] View resource group details (name, location, provisioning state, tags)
