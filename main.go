@@ -29,7 +29,6 @@ func main() {
 
 	// Check if demo mode is enabled
 	if os.Getenv("LAZYAZURE_DEMO") == "1" {
-		fmt.Println("Demo mode enabled - using mock Azure data...")
 		utils.Log("Demo mode enabled")
 
 		// Create demo client
@@ -37,7 +36,6 @@ func main() {
 		azureClient = demoClient
 		clientFactory = demoClient
 
-		fmt.Println("Demo mode active! Starting GUI...")
 	} else {
 		// Create real Azure client
 		client, err := azure.NewClient()
@@ -56,8 +54,6 @@ func main() {
 			os.Exit(1)
 		}
 		utils.Log("Authentication verified successfully")
-
-		fmt.Println("Authentication successful! Starting GUI...")
 
 		azureClient = client
 		clientFactory = azure.NewClientFactory(client)
@@ -79,7 +75,6 @@ func main() {
 	if runErr != nil {
 		if runErr.Error() == "quit" || runErr.Error() == gocui.ErrQuit.Error() {
 			utils.Log("Normal quit - exiting cleanly")
-			fmt.Println("Goodbye!")
 			os.Exit(0)
 		} else {
 			utils.Log("ERROR: GUI error: %v", runErr)
@@ -88,6 +83,5 @@ func main() {
 	}
 
 	utils.Log("Application exiting normally")
-	fmt.Println("Goodbye!")
 	os.Exit(0)
 }
