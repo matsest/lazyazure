@@ -194,11 +194,9 @@ func (gui *Gui) setupViews() error {
 
 	// 4. Resources panel (new!)
 	resY0 := rgY1 + 1
-	resY1 := resY0 + panelHeight
-	// If there's extra space due to integer division, give it to resources
-	if resY1 < statusY-1 {
-		resY1 = statusY - 1
-	}
+	// Resources should align with main panel which ends at statusY
+	// Both panels' bottom borders should be at the same Y coordinate
+	resY1 := statusY
 	if v, err := gui.g.SetView("resources", 0, resY0, sidebarWidth-1, resY1, 0); err != nil {
 		if !gocui.IsUnknownView(err) {
 			return err
