@@ -233,7 +233,10 @@ pkg/
 │   ├── tasks.go
 │   └── tasks_test.go        # Task manager tests
 └── utils/          # Utilities
-    └── logger.go            # Debug logging (opt-in via LAZYAZURE_DEBUG)
+    ├── logger.go            # Debug logging (opt-in via LAZYAZURE_DEBUG)
+    ├── clipboard.go         # Clipboard operations (cross-platform)
+    ├── portal_urls.go       # Azure Portal URL generation
+    └── portal_urls_test.go  # Portal URL tests
 ```
 
 ### 10. Code Style
@@ -279,7 +282,9 @@ pkg/
 
 ## Session Checklist
 
-Before finishing a session:
+**CRITICAL: Complete this checklist BEFORE committing any changes.**
+
+Before finishing a session or committing changes:
 
 - [ ] Code builds without errors: `go build .`
 - [ ] Tests have been updated or added per the guideline in this file
@@ -289,6 +294,8 @@ Before finishing a session:
 - [ ] No mutex deadlocks introduced (verify lock patterns)
 - [ ] Documentation updated if needed (README.md, this file)
 - [ ] File organization in README and AGENTS is updated
+
+**Do not commit until all checklist items are verified!**
 
 ## Key Lessons from Development
 

@@ -167,7 +167,10 @@ lazyazure/
 │   ├── tasks/
 │   │   └── tasks.go             # Async task management
 │   └── utils/
-│       └── logger.go            # Debug logging utility
+│       ├── logger.go            # Debug logging utility
+│       ├── clipboard.go         # Clipboard operations
+│       ├── portal_urls.go       # Azure Portal URL generation
+│       └── portal_urls_test.go  # Portal URL tests
 ```
 
 ## Project Status

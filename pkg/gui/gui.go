@@ -333,6 +333,12 @@ func (gui *Gui) setupKeybindings() error {
 	}
 	utils.Log("setupKeybindings: Refresh key set")
 
+	// Copy portal link (global)
+	if err := gui.g.SetKeybinding("", 'c', gocui.ModNone, gui.copyPortalUrl); err != nil {
+		return err
+	}
+	utils.Log("setupKeybindings: Copy portal link key set")
+
 	// Panel switching with Tab key
 	if err := gui.g.SetKeybinding("", gocui.KeyTab, gocui.ModNone, gui.switchPanel); err != nil {
 		return err
@@ -906,6 +912,75 @@ func (gui *Gui) nextTab(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+// copyPortalUrl copies the Azure Portal URL for the currently selected item to clipboard
+func (gui *Gui) copyPortalUrl(g *gocui.Gui, v *gocui.View) error {
+	gui.mu.RLock()
+	selectedSub := gui.selectedSub
+	selectedRG := gui.selectedRG
+	selectedRes := gui.selectedRes
+	activePanel := gui.activePanel
+	gui.mu.RUnlock()
+
+	var url string
+	var itemType string
+
+	// Build URL based on what's selected and active panel
+	switch activePanel {
+	case "subscriptions":
+		if selectedSub == nil {
+			gui.showTemporaryStatus("No subscription selected")
+			return nil
+		}
+		url = utils.BuildSubscriptionPortalURL(selectedSub.TenantID, selectedSub.ID)
+		itemType = "subscription"
+	case "resourcegroups":
+		if selectedRG == nil || selectedSub == nil {
+			gui.showTemporaryStatus("No resource group selected")
+			return nil
+		}
+		url = utils.BuildResourceGroupPortalURL(selectedSub.TenantID, selectedRG.SubscriptionID, selectedRG.Name)
+		itemType = "resource group"
+	case "resources", "main":
+		if selectedRes == nil || selectedSub == nil {
+			gui.showTemporaryStatus("No resource selected")
+			return nil
+		}
+		url = utils.BuildResourcePortalURL(selectedSub.TenantID, selectedRes.ID)
+		itemType = "resource"
+	default:
+		gui.showTemporaryStatus("No item selected")
+		return nil
+	}
+
+	// Copy to clipboard
+	if err := utils.CopyToClipboard(url); err != nil {
+		gui.showTemporaryStatus(fmt.Sprintf("Failed to copy: %v", err))
+		return nil
+	}
+
+	gui.showTemporaryStatus(fmt.Sprintf("Copied %s portal link to clipboard", itemType))
+	return nil
+}
+
+// showTemporaryStatus shows a temporary status message that reverts after a delay
+func (gui *Gui) showTemporaryStatus(message string) {
+	if gui.statusView == nil {
+		return
+	}
+
+	gui.statusView.Clear()
+	fmt.Fprint(gui.statusView, message)
+
+	// Restore normal status after 2 seconds
+	go func() {
+		time.Sleep(2 * time.Second)
+		gui.g.UpdateAsync(func(g *gocui.Gui) error {
+			gui.updateStatus()
+			return nil
+		})
+	}()
+}
+
 // ANSI color codes
 const (
 	// Color 114 from 256-color palette (github-dark key color) + bold
@@ -1139,13 +1214,13 @@ func (gui *Gui) updateStatus() {
 	var status string
 	switch activePanel {
 	case "subscriptions":
-		status = fmt.Sprintf("↑↓: Navigate | Enter: Load RGs | Tab: Switch | r: Refresh | q: Quit | Subs: %d", subCount)
+		status = fmt.Sprintf("↑↓: Navigate | Enter: Load RGs | c: Copy Link | Tab: Switch | r: Refresh | q: Quit | Subs: %d", subCount)
 	case "resourcegroups":
-		status = fmt.Sprintf("↑↓: Navigate | Enter: Load Resources | Tab: Switch | []: Tabs | r: Refresh | q: Quit | RGs: %d", rgCount)
+		status = fmt.Sprintf("↑↓: Navigate | Enter: Load Resources | c: Copy Link | Tab: Switch | []: Tabs | r: Refresh | q: Quit | RGs: %d", rgCount)
 	case "resources":
-		status = fmt.Sprintf("↑↓: Navigate | Enter: View Details | Tab: Switch | []: Tabs | r: Refresh | q: Quit | Resources: %d", resCount)
+		status = fmt.Sprintf("↑↓: Navigate | Enter: View Details | c: Copy Link | Tab: Switch | []: Tabs | r: Refresh | q: Quit | Resources: %d", resCount)
 	case "main":
-		status = fmt.Sprintf("↑/↓ or j/k: Scroll | PgUp/PgDn: Page | Tab: Back to List | []: Tabs | r: Refresh | q: Quit")
+		status = fmt.Sprintf("↑/↓ or j/k: Scroll | PgUp/PgDn: Page | c: Copy Link | Tab: Back to List | []: Tabs | r: Refresh | q: Quit")
 	default:
 		status = fmt.Sprintf("↑↓: Navigate | Tab: Switch | r: Refresh | q: Quit")
 	}
