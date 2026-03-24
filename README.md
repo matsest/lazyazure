@@ -177,7 +177,7 @@ lazyazure/
 - **Phase 3**: ✅ Complete - Resources browser with 3-level hierarchy
 - **Phase 4**: 📝 Planned - Polish & advanced features
 
-See `PLAN.md` for the full implementation roadmap.
+See [PLAN.md](./PLAN.md) for the full implementation roadmap.
 
 ## Dependencies
 
