@@ -134,9 +134,9 @@ A TUI application for Azure resource management, inspired by lazydocker. It prov
 
 2. **Keyboard Shortcuts**
    - `/` for search
-   - `q` or `Ctrl+C` to quit
-   - Arrow keys for navigation
-   - `Tab` for switching right panel tabs
+   - ✅ `q` or `Ctrl+C` to quit
+   - ✅ Arrow keys for navigation
+   - ✅ `Tab` for switching right panel tabs
    - `Enter` to drill down, `Esc` or `h` to go back
 
 3. **Caching**
@@ -216,26 +216,3 @@ lazyazure/
 3. **Generic Panels**: Go generics for type-safe, reusable UI components
 4. **Async Tasks**: Background loading to keep UI responsive
 5. **Layout**: Box-based responsive layout system from lazycore
-
----
-
-## MVP Success Criteria
-
-- [x] User can launch and see current Azure identity
-- [x] Left panel shows list of subscriptions (name, ID)
-- [x] Can navigate subscriptions with arrow keys
-- [x] Right panel shows subscription details in JSON and summary tabs
-- [x] Can switch tabs with `[` and `]`
-- [x] App gracefully handles authentication failures
-- [x] Clean exit with `q` or `Ctrl+C`
-- [x] Navigate to resource groups within subscriptions
-- [x] View resource group details (name, location, provisioning state, tags)
-
-## Phase 3 Success Criteria
-
-- [x] Browse resources within resource groups
-- [x] View full resource details with provider-specific properties
-- [x] Dynamic API version lookup for resource types
-- [x] Color-coded UI with syntax highlighting
-- [x] Scrollable content in details panel
-- [x] Sorted and formatted display of tags and properties
