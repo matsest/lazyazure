@@ -219,6 +219,15 @@ See [PLAN.md](./PLAN.md) for the full implementation roadmap.
 
 LazyAzure uses Microsoft's official [Azure SDK for Go](https://github.com/Azure/azure-sdk-for-go) with DefaultAzureCredential for authentication, supporting Azure CLI, Azure PowerShell, Managed Identity, environment variables, and other official Azure authentication methods. The application does not store credentials or sensitive data to disk; all tokens are handled in-memory only during runtime. No telemetry or logs is collected. Communication with Azure APIs uses HTTPS/TLS exclusively. [Debug logging](#debug-logging) is disabled by default and can be enabled via the `LAZYAZURE_DEBUG`` environment variable, which optionally logs to a local file in a users home directory. The repository is open source ([MIT License](./LICENSE)) and uses [Dependabot](./.github/dependabot.yml) for automated dependency/security updates and GitHub's [CodeQL](https://docs.github.com/en/code-security/concepts/code-scanning/codeql/about-code-scanning-with-codeql) for security analysis.
 
+## Contributing
+
+Found a bug or have a feature idea? We welcome your feedback!
+
+- **Bug reports**: [Open an issue](../../issues/new?template=bug_report.md) with details about the problem, your environment, and steps to reproduce
+- **Feature requests**: [Open an issue](../../issues/new?template=feature_request.md) describing the feature and your use case
+
+Please check [existing issues](../../issues) first to avoid duplicates.
+
 ## License
 
 [MIT](LICENSE)
