@@ -20,7 +20,7 @@ builds:
       - -X main.date={{.Date}}
 
 archives:
-  - format: binary
+  - formats: binary
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     # Don't include README, LICENSE, etc.
     files:
@@ -44,7 +44,7 @@ changelog:
     - title: Features
       regexp: "^feat[\\w-]*:"
       order: 0
-    - title: Bug Fixes
+    - title: Improvements
       regexp: "^fix[\\w-]*:"
       order: 1
     - title: Updates
