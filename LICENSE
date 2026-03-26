@@ -19,3 +19,32 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+Third-Party Dependencies
+
+This software uses the following open source packages:
+
+Direct Dependencies:
+- Azure SDK for Go (github.com/Azure/azure-sdk-for-go) - MIT License
+  Copyright (c) Microsoft Corporation
+- gocui (github.com/jesseduffield/gocui) - BSD 2-Clause License
+  Copyright (c) 2014 The gocui Authors
+- Chroma (github.com/alecthomas/chroma) - MIT License
+  Copyright (c) 2017 Alec Thomas
+- clipboard (github.com/atotto/clipboard) - BSD 3-Clause License
+  Copyright (c) 2013 Ato Araki
+- tcell (github.com/gdamore/tcell) - Apache License 2.0
+- MSAL for Go (github.com/AzureAD/microsoft-authentication-library-for-go) - MIT License
+  Copyright (c) Microsoft Corporation
+
+Transitive Dependencies:
+- golang-jwt/jwt - MIT License
+- go-colorful - MIT License
+- go-runewidth - MIT License
+- uniseg - MIT License
+- google/uuid - BSD 3-Clause License
+- golang.org/x/* packages - BSD 3-Clause License
+
+For full license texts, see the respective repositories.
