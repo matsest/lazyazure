@@ -28,11 +28,18 @@ See [PLAN.md](./PLAN.md) for implementation details and roadmap.
 
 ### Prerequisites
 
-- Azure account with appropriate permissions
-- Go 1.26.1+ installed
+### System Requirements
 
-Optional:
-- Azure CLI installed (for `az login` convenience method)
+- **Go**: 1.26.1+
+- **Terminal**: Modern terminal with Unicode and 256-color support (IDE consoles not recommended). Some recommendations:
+  - MacOS:Ghostty, iTerm2, Terminal.app
+  - Linux: Ghostty, Alacritty, Kitty, etc.
+  - Windows: Windows Terminal
+
+### Azure Requirements
+
+- Azure account with appropriate permissions
+- Azure CLI installed (optional, for `az login` convenience method)
 
 ### Install from Source
 
@@ -62,6 +69,8 @@ go build .
    export AZURE_CLIENT_SECRET="your-client-secret"
    export AZURE_TENANT_ID="your-tenant-id"
    ```
+
+See other methods under [authentication](#Authentication).
 
 2. **Run lazyazure**:
    ```bash
@@ -139,6 +148,14 @@ To view logs:
 ```bash
 cat ~/.lazyazure/debug.log
 ```
+
+## Cross-Platform Support
+
+- **Linux**: Full support
+- **macOS**: Full support
+- **Windows**: Good support (recommend Windows Terminal; classic CMD/PowerShell not recommended)
+
+Linux clipboard requires `xclip` or `xsel` (X11) or `wl-copy` (Wayland). macOS and Windows have native clipboard support. If using WSL it should pick up the Windows clipboard.
 
 ## Architecture
 

@@ -305,6 +305,43 @@ Before finishing a session or committing changes:
 4. **Ghostty**: Preferred terminal for testing
 5. **Debug logs are essential**: But must be opt-in for production
 
+## Terminal Requirements and Testing
+
+### Required Terminal Features
+
+The application requires terminals that support:
+- **Unicode box-drawing characters**: `┌─┐│└┘` for panel borders
+- **256-color ANSI support**: For green color-coded keys (ANSI 256-color code 114) and JSON syntax highlighting
+- **ANSI escape sequences**: For bold text and color resets (`\x1b[0m`)
+
+### Testing Checklist
+
+Ask the user to verify tests when changing the UI. Some example criterias to test:
+
+- [ ] Test in a real terminal (not IDE console)
+- [ ] Verify colors render correctly (green keys should be visible)
+- [ ] Verify box-drawing characters display properly (no `?` or garbage characters)
+- [ ] Test on minimum terminal size (80x24 should work, though larger is better)
+- [ ] Verify clipboard operations work on target platform
+
+### Platform-Specific Considerations
+
+| Feature | Linux | macOS | Windows |
+|---------|-------|-------|---------|
+| Unicode | Full | Full | Windows Terminal only |
+| 256-color | Full | Full | Windows Terminal only |
+| Clipboard | Needs xclip/xsel/wl-copy | Native | Native |
+| Recommended Terminal | Ghostty, Alacritty, Kitty | iTerm2, Ghostty, Terminal.app | Windows Terminal |
+
+### IDE Consoles
+
+**IMPORTANT**: IDE built-in terminals (VS Code, JetBrains, etc.) may not render TUI applications correctly:
+- May not process arrow keys properly
+- May display box-drawing characters incorrectly
+- May not support all ANSI escape sequences
+
+Always test in a standalone terminal application.
+
 ## Questions to Ask User
 
 When uncertain about:
