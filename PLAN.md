@@ -72,9 +72,10 @@ A TUI application for Azure resource management, inspired by lazydocker. It prov
 
 3. **Layout Redesign** ✅
    - Stacked panel layout (inspired by lazydocker)
-   - Auth panel (3 lines) - shows current user
-   - Subscriptions panel (40% of sidebar)
-   - Resource Groups panel (remaining space)
+   - Auth panel (5 lines fixed) - shows current user
+   - Subscriptions panel (20% of remaining sidebar)
+   - Resource Groups panel (30% of remaining sidebar)
+   - Resources panel (remaining ~50% of sidebar)
    - All panels visible simultaneously
 
 4. **Navigation System** ✅
@@ -125,47 +126,74 @@ A TUI application for Azure resource management, inspired by lazydocker. It prov
 
 **Goal:** Production-ready with UX improvements
 
-### Implementation Steps:
+**Status:** Partially implemented - core features complete, advanced features in backlog
 
-1. **Search & Filtering**
-   - Real-time search/filter in all panels
-   - Fuzzy matching
-   - Case-insensitive search
-
-2. **Keyboard Shortcuts**
+**Keyboard Shortcuts**
    - `/` for search
    - ✅ `q` or `Ctrl+C` to quit
    - ✅ Arrow keys for navigation
    - ✅ `Tab` for switching right panel tabs
    - `Enter` to drill down, `Esc` or `h` to go back
 
-3. **Caching**
-   - In-memory cache for API responses
-   - Refresh with `r` key
-   - Expire cache after time interval
+**Visual Polish**
+- ✅ Color-coded keys in Summary view (green)
+- ✅ JSON syntax highlighting with Chroma
+- ✅ Bold text for list indicators
+- ✅ Green border for focused panel
+- ✅ Gray suffix formatting (subscription ID, location, resource type)
+- ✅ Human-readable resource type names (e.g., "Virtual Machine" not "virtualMachines")
+- ✅ Sorted tags and properties
+- ✅ Case-insensitive resource type lookup
 
-4. **Configuration**
-   - Config file support (`~/.config/lazyazure/config.yml`)
-   - Theme customization
-   - Default subscription preference
+**Navigation**
+- ✅ `q` or `Ctrl+C` to quit
+- ✅ Arrow keys and `j`/`k` for navigation
+- ✅ `Tab` / `Shift+Tab` for panel switching
+- ✅ `Enter` to drill down hierarchy
+- ✅ `[` / `]` for Summary/JSON tabs
+- ✅ `r` for manual refresh
+- ✅ `c` to copy portal link
 
-5. **Visual Polish** ✅ (Partially Complete)
-   - ✅ Color-coded keys in Summary view (green)
-   - ✅ JSON syntax highlighting with Chroma
-   - ✅ Bold text for list indicators
-   - ✅ Green border for focused panel
-   - ✅ Sorted tags and properties
+**Performance**
+- ✅ Lazy loading (fetch on demand)
+- ✅ API version caching for resource providers
+- ✅ Async task management (non-blocking UI)
 
-6. **Error Handling**
-   - Graceful handling of auth failures
-   - Retry logic for API calls
-   - Status bar messages
+---
 
-7. **Performance**
-   - ✅ Lazy loading (fetch on demand) - Already implemented
-   - API version caching for resource providers
-   - Pagination for large resource lists
-   - Background refresh
+## Backlog: Future Enhancements
+
+The following features are planned but not yet implemented:
+
+### Search & Filtering
+- Real-time search/filter in all panels (`/` key)
+- Fuzzy matching
+- Case-insensitive search
+
+### Navigation Improvements
+- `Esc` or `h` to navigate back up hierarchy
+- Mouse navigation (click to change focus between boxes and items)
+
+### Caching
+- In-memory cache for API responses
+- Cache expiration/invalidation
+- Background refresh
+
+### Configuration
+- Config file support (`~/.config/lazyazure/config.yml`)
+- Theme customization
+- Default subscription preference
+- Custom keybindings
+
+### Error Handling
+- Retry logic with exponential backoff
+- Better error messages in UI
+- Connection status indicator
+
+### Performance
+- UI-level pagination controls
+- Virtual scrolling for large lists
+- Optimistic updates
 
 ---
 
@@ -195,6 +223,10 @@ lazyazure/
 │   │   ├── resourcegroup.go     # ResourceGroup domain model
 │   │   ├── resource.go          # Generic Resource domain model
 │   │   └── domain_test.go       # Domain model tests
+│   ├── resources/
+│   │   ├── display_names.go     # Resource type display name loader
+│   │   ├── display_names.json   # Human-readable resource type mappings
+│   │   └── display_names_test.go # Display name tests
 │   ├── gui/
 │   │   ├── gui.go               # Main GUI controller with all TUI logic
 │   │   ├── gui_test.go          # GUI tests
@@ -216,3 +248,36 @@ lazyazure/
 3. **Generic Panels**: Go generics for type-safe, reusable UI components
 4. **Async Tasks**: Background loading to keep UI responsive
 5. **Layout**: Box-based responsive layout system from lazycore
+
+---
+
+## MVP Success Criteria
+
+- [x] User can launch and see current Azure identity
+- [x] Left panel shows list of subscriptions (name, ID)
+- [x] Can navigate subscriptions with arrow keys
+- [x] Right panel shows subscription details in JSON and summary tabs
+- [x] Can switch tabs with `[` and `]`
+- [x] App gracefully handles authentication failures
+- [x] Clean exit with `q` or `Ctrl+C`
+- [x] Navigate to resource groups within subscriptions
+- [x] View resource group details (name, location, provisioning state, tags)
+
+## Phase 3 Success Criteria
+
+- [x] Browse resources within resource groups
+- [x] View full resource details with provider-specific properties
+- [x] Dynamic API version lookup for resource types
+- [x] Color-coded UI with syntax highlighting
+- [x] Scrollable content in details panel
+- [x] Sorted and formatted display of tags and properties
+
+## Phase 4 Success Criteria (Partial)
+
+- [x] Resource type display names (human-readable)
+- [x] Gray suffix formatting for all sidebar items
+- [x] Copy portal link to clipboard
+- [ ] Search/filter functionality
+- [ ] Configuration file support
+- [ ] API response caching
+- [ ] Background refresh
