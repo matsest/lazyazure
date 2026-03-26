@@ -91,7 +91,7 @@ See other methods under [authentication](#Authentication).
 
 2. **Run lazyazure**:
    ```bash
-   ./lazyazure
+   lazyazure
    ```
 
 ### Controls
@@ -139,7 +139,7 @@ LazyAzure includes a demo mode that runs with mock Azure data - no Azure credent
 To run in demo mode:
 
 ```bash
-LAZYAZURE_DEMO=1 ./lazyazure
+LAZYAZURE_DEMO=1 lazyazure
 ```
 
 Demo mode provides:
@@ -156,7 +156,7 @@ All data in demo mode is completely fake and safe to display publicly.
 To enable debug logging for troubleshooting, set the `LAZYAZURE_DEBUG` environment variable:
 
 ```bash
-LAZYAZURE_DEBUG=1 ./lazyazure
+LAZYAZURE_DEBUG=1 lazyazure
 ```
 
 Debug logs are written to `~/.lazyazure/debug.log`.
