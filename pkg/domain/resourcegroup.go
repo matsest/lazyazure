@@ -19,3 +19,8 @@ func (rg *ResourceGroup) DisplayString() string {
 func (rg *ResourceGroup) GetID() string {
 	return rg.ID
 }
+
+// GetDisplaySuffix returns the suffix to display (location)
+func (rg *ResourceGroup) GetDisplaySuffix() string {
+	return rg.Location
+}

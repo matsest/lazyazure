@@ -69,6 +69,32 @@ func TestSubscriptionJSONTags(t *testing.T) {
 	}
 }
 
+func TestSubscriptionDisplayString(t *testing.T) {
+	sub := &Subscription{
+		ID:   "sub-123",
+		Name: "Test Subscription",
+	}
+
+	got := sub.DisplayString()
+	want := "Test Subscription"
+	if got != want {
+		t.Errorf("DisplayString() = %q, want %q", got, want)
+	}
+}
+
+func TestSubscriptionGetDisplaySuffix(t *testing.T) {
+	sub := &Subscription{
+		ID:   "sub-123",
+		Name: "Test Subscription",
+	}
+
+	got := sub.GetDisplaySuffix()
+	want := "sub-123"
+	if got != want {
+		t.Errorf("GetDisplaySuffix() = %q, want %q", got, want)
+	}
+}
+
 func TestResourceGroupJSONTags(t *testing.T) {
 	rg := &ResourceGroup{
 		Name:              "test-rg",
@@ -94,6 +120,32 @@ func TestResourceGroupJSONTags(t *testing.T) {
 	}
 	if _, ok := result["subscriptionId"]; !ok {
 		t.Error("Expected 'subscriptionId' key in JSON")
+	}
+}
+
+func TestResourceGroupDisplayString(t *testing.T) {
+	rg := &ResourceGroup{
+		Name:     "test-rg",
+		Location: "westeurope",
+	}
+
+	got := rg.DisplayString()
+	want := "test-rg"
+	if got != want {
+		t.Errorf("DisplayString() = %q, want %q", got, want)
+	}
+}
+
+func TestResourceGroupGetDisplaySuffix(t *testing.T) {
+	rg := &ResourceGroup{
+		Name:     "test-rg",
+		Location: "westeurope",
+	}
+
+	got := rg.GetDisplaySuffix()
+	want := "westeurope"
+	if got != want {
+		t.Errorf("GetDisplaySuffix() = %q, want %q", got, want)
 	}
 }
 
@@ -155,6 +207,56 @@ func TestResourceGetShortType(t *testing.T) {
 		got := res.GetShortType()
 		if got != tt.expected {
 			t.Errorf("GetShortType(%q) = %q, want %q", tt.input, got, tt.expected)
+		}
+	}
+}
+
+func TestResourceDisplayString(t *testing.T) {
+	tests := []struct {
+		name         string
+		resourceType string
+		want         string
+	}{
+		{"my-vm", "Microsoft.Compute/virtualMachines", "my-vm"},
+		{"prod-storage", "Microsoft.Storage/storageAccounts", "prod-storage"},
+		{"web-api", "Microsoft.Web/sites", "web-api"},
+		{"my-keyvault", "Microsoft.KeyVault/vaults", "my-keyvault"},
+		{"aks-cluster", "Microsoft.ContainerService/managedClusters", "aks-cluster"},
+	}
+
+	for _, tt := range tests {
+		res := &Resource{
+			Name: tt.name,
+			Type: tt.resourceType,
+		}
+		got := res.DisplayString()
+		if got != tt.want {
+			t.Errorf("DisplayString() = %q, want %q", got, tt.want)
+		}
+	}
+}
+
+func TestResourceGetDisplaySuffix(t *testing.T) {
+	tests := []struct {
+		name         string
+		resourceType string
+		want         string
+	}{
+		{"my-vm", "Microsoft.Compute/virtualMachines", "Virtual Machine"},
+		{"prod-storage", "Microsoft.Storage/storageAccounts", "Storage Account"},
+		{"web-api", "Microsoft.Web/sites", "Web App"},
+		{"my-keyvault", "Microsoft.KeyVault/vaults", "Key Vault"},
+		{"aks-cluster", "Microsoft.ContainerService/managedClusters", "AKS Cluster"},
+	}
+
+	for _, tt := range tests {
+		res := &Resource{
+			Name: tt.name,
+			Type: tt.resourceType,
+		}
+		got := res.GetDisplaySuffix()
+		if got != tt.want {
+			t.Errorf("GetDisplaySuffix() = %q, want %q", got, tt.want)
 		}
 	}
 }

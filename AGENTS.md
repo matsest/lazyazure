@@ -223,6 +223,10 @@ pkg/
 │   ├── resourcegroup.go     # ResourceGroup domain model
 │   ├── resource.go          # Generic Resource domain model
 │   └── domain_test.go       # Domain model tests (JSON tags, helpers)
+├── resources/      # Resource type display names
+│   ├── display_names.go     # Loader and fallback algorithm
+│   ├── display_names.json   # Azure resource type to human-readable name mappings
+│   └── display_names_test.go # Display name tests
 ├── gui/            # TUI implementation
 │   ├── gui.go               # Main GUI controller with all TUI logic
 │   ├── gui_test.go          # GUI tests
@@ -280,6 +284,48 @@ pkg/
 - Apply to tags, properties, or any map data shown in UI
 - Prevents "shuffle" effect when navigating between items
 
+#### Display Pattern for List Items
+Domain models that appear in sidebar lists follow a consistent pattern:
+- `DisplayString()` returns the primary name (plain text, no ANSI codes)
+- `GetDisplaySuffix()` returns additional info to display in gray
+- GUI calls `formatWithGraySuffix(name, suffix)` to apply gray formatting
+
+Example:
+```go
+// In domain model
+func (r *Resource) DisplayString() string { return r.Name }
+func (r *Resource) GetDisplaySuffix() string { return resources.GetResourceTypeDisplayName(r.Type) }
+
+// In GUI
+fmt.Fprintln(view, formatWithGraySuffix(res.DisplayString(), res.GetDisplaySuffix()))
+// Output: "my-vm (Virtual Machine)" with type in gray
+```
+
+### Resource Type Display Names
+
+Azure resource types (e.g., "Microsoft.Compute/virtualMachines") are mapped to human-readable names (e.g., "Virtual Machine") for the UI.
+
+#### Implementation (`pkg/resources/`)
+
+**Core Mapping** (`display_names.json`):
+- JSON file with 75+ resource type mappings
+- Manually curated for most common Azure resource types
+- Easy to extend via PRs
+
+**Lookup Strategy** (`display_names.go`):
+1. Exact match in core mapping
+2. Case-insensitive match (Azure returns lowercase from list API)
+3. Algorithmic fallback:
+   - Multi-word resource names: Convert camelCase to spaces + singularize
+   - Single word: Use provider name + resource name
+   - Known acronyms: IP, SQL, NSG, AKS, etc.
+   - Plural handling: services→service, addresses→address, machines→machine
+
+**Adding New Mappings**:
+1. Add entry to `display_names.json` following existing format
+2. Add test case in `display_names_test.go`
+3. Test both exact and case-insensitive lookups
+
 ## Session Checklist
 
 **CRITICAL: Complete this checklist BEFORE committing any changes.**
@@ -292,8 +338,14 @@ Before finishing a session or committing changes:
 - [ ] Code is properly formatted: `gofmt -l .` returns empty
 - [ ] Debug logging is properly guarded with `LAZYAZURE_DEBUG` check
 - [ ] No mutex deadlocks introduced (verify lock patterns)
-- [ ] Documentation updated if needed (README.md, this file)
-- [ ] File organization in README and AGENTS is updated
+- [ ] **Documentation updated**:
+  - [ ] README.md - File organization section updated if new packages added
+  - [ ] AGENTS.md - File organization section, relevant guidelines, and checklist updated
+  - [ ] New features/patterns documented in appropriate sections
+- [ ] **File organization documented**:
+  - [ ] New packages added to README architecture diagram
+  - [ ] New packages added to AGENTS.md section 9 (File Organization)
+  - [ ] Any new patterns or conventions documented
 
 **Do not commit until all checklist items are verified!**
 

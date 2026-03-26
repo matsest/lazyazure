@@ -178,6 +178,10 @@ lazyazure/
 │   │   ├── subscription.go      # Subscription domain model
 │   │   ├── resourcegroup.go     # ResourceGroup domain model
 │   │   └── resource.go          # Generic Resource domain model
+│   ├── resources/
+│   │   ├── display_names.go     # Resource type display name loader
+│   │   ├── display_names.json   # Human-readable resource type mappings
+│   │   └── display_names_test.go # Display name tests
 │   ├── gui/
 │   │   ├── gui.go               # Main TUI controller
 │   │   ├── interfaces.go        # Client interfaces

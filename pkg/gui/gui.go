@@ -19,6 +19,18 @@ import (
 	"github.com/matsest/lazyazure/pkg/utils"
 )
 
+// ANSI color code for gray text (256-color palette)
+const grayColor = "\x1b[38;5;245m"
+const resetColor = "\x1b[0m"
+
+// formatWithGraySuffix formats a name with a gray suffix in parentheses
+func formatWithGraySuffix(name, suffix string) string {
+	if suffix == "" {
+		return name
+	}
+	return name + " " + grayColor + "(" + suffix + ")" + resetColor
+}
+
 // Gui is the main GUI controller
 type Gui struct {
 	g             *gocui.Gui
@@ -438,7 +450,7 @@ func (gui *Gui) refreshSubscriptionsPanel() {
 	gui.mu.RUnlock()
 
 	for _, sub := range subs {
-		fmt.Fprintln(gui.subscriptionsView, sub.DisplayString())
+		fmt.Fprintln(gui.subscriptionsView, formatWithGraySuffix(sub.DisplayString(), sub.GetDisplaySuffix()))
 	}
 }
 
@@ -453,7 +465,7 @@ func (gui *Gui) refreshResourceGroupsPanel() {
 	gui.mu.RUnlock()
 
 	for _, rg := range rgs {
-		fmt.Fprintln(gui.resourceGroupsView, rg.DisplayString())
+		fmt.Fprintln(gui.resourceGroupsView, formatWithGraySuffix(rg.DisplayString(), rg.GetDisplaySuffix()))
 	}
 }
 
@@ -468,7 +480,7 @@ func (gui *Gui) refreshResourcesPanel() {
 	gui.mu.RUnlock()
 
 	for _, res := range resources {
-		fmt.Fprintln(gui.resourcesView, res.DisplayString())
+		fmt.Fprintln(gui.resourcesView, formatWithGraySuffix(res.DisplayString(), res.GetDisplaySuffix()))
 	}
 }
 

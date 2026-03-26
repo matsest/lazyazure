@@ -1,5 +1,7 @@
 package domain
 
+import "github.com/matsest/lazyazure/pkg/resources"
+
 // Resource represents a generic Azure resource
 type Resource struct {
 	ID             string                 `json:"id"`
@@ -17,6 +19,11 @@ type Resource struct {
 // DisplayString returns a string representation for the UI
 func (r *Resource) DisplayString() string {
 	return r.Name
+}
+
+// GetDisplaySuffix returns the suffix to display (resource type)
+func (r *Resource) GetDisplaySuffix() string {
+	return resources.GetResourceTypeDisplayName(r.Type)
 }
 
 // GetID returns the resource ID
