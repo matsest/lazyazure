@@ -47,26 +47,25 @@ Download the latest binary for your platform from the [releases page](https://gi
 
 **macOS (Apple Silicon):**
 ```bash
-curl -LO https://github.com/matsest/lazyazure/releases/latest/download/lazyazure_darwin_arm64
-chmod +x lazyazure_darwin_arm64
-sudo mv lazyazure_darwin_arm64 /usr/local/bin/lazyazure
+curl -LO https://github.com/matsest/lazyazure/releases/download/v0.1.0/lazyazure_0.1.0_darwin_arm64
+chmod +x lazyazure_0.1.0_darwin_arm64
+sudo mv lazyazure_0.1.0_darwin_arm64 /usr/local/bin/lazyazure
 ```
-
 
 **Linux:**
 ```bash
-curl -LO https://github.com/matsest/lazyazure/releases/latest/download/lazyazure_linux_amd64
-chmod +x lazyazure_linux_amd64
-sudo mv lazyazure_linux_amd64 /usr/local/bin/lazyazure
+curl -LO https://github.com/matsest/lazyazure/releases/download/v0.1.0/lazyazure_0.1.0_linux_amd64
+chmod +x lazyazure_0.1.0_linux_amd64
+sudo mv lazyazure_0.1.0_linux_amd64 /usr/local/bin/lazyazure
 ```
 
-**Windows:** Download `lazyazure_windows_amd64.exe` from the releases page and add it to your PATH.
+**Windows:** Download `lazyazure_0.1.0_windows_amd64.exe` from the releases page and add it to your PATH.
 
 **Verify Checksum (optional):**
 ```bash
 # Download checksums file and verify
-curl -LO https://github.com/matsest/lazyazure/releases/latest/download/lazyazure_checksums.txt
-sha256sum -c lazyazure_checksums.txt
+curl -LO https://github.com/matsest/lazyazure/releases/download/v0.1.0/lazyazure_0.1.0_checksums.txt
+sha256sum -c lazyazure_0.1.0_checksums.txt
 ```
 
 
