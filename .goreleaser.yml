@@ -20,11 +20,12 @@ builds:
       - -X main.date={{.Date}}
 
 archives:
-  - format: binary
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    # Don't include README, LICENSE, etc.
-    files:
-      - none*
+  - format_overrides:
+    - formats: binary
+      name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+      # Don't include README, LICENSE, etc.
+      files:
+        - none*
 
 checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
@@ -60,16 +61,10 @@ release:
   # Footer for the release notes
   footer: |
     ## Installation
-    
-    Download the binary for your platform and make it executable (on Unix systems):
-    
-    ```bash
-    # Linux/macOS example
-    chmod +x lazyazure_{{ .Version }}_linux_amd64
-    sudo mv lazyazure_{{ .Version }}_linux_amd64 /usr/local/bin/lazyazure
-    ```
-    
-    See the README for detailed installation instructions.
+
+    Download the binary for your platform and make it executable.
+
+    See the [README](https://github.com/matsest/lazyazure) for detailed installation instructions.
 
 # Disable source archives
 source:
