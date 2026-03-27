@@ -1,5 +1,12 @@
 # LazyAzure
 
+<a href="https://github.com/matsest/lazyazure/releases"><img src="https://img.shields.io/github/v/release/matsest/lazyazure?style=flat-square" alt="Release"></a>
+<img src="https://img.shields.io/badge/Go-1.26+-00ADD8?style=flat-square&logo=go" alt="Go Version">
+<a href="https://goreportcard.com/report/github.com/matsest/lazyazure"><img src="https://goreportcard.com/badge/github.com/matsest/lazyazure?style=flat-square" alt="Go Report Card"></a>
+<a href="https://pkg.go.dev/github.com/matsest/lazyazure"><img src="https://pkg.go.dev/badge/github.com/matsest/lazyazure.svg" alt="Go Reference"></a>
+<img src="https://img.shields.io/badge/platform-windows%20%7C%20linux%20%7C%20macos-blue?style=flat-square" alt="Platform">
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://github.com/matsest/lazyazure/blob/main/LICENSE)
+
 A TUI application for Azure resource management, inspired by [lazydocker](https://github.com/jesseduffield/lazydocker). Browse Azure subscriptions, resource groups, and resources with an interactive terminal interface.
 
 > **About This Project**: This project is vibe-coded with [OpenCode](https://opencode.ai). It is provided as-is without warranties ([MIT License](./LICENSE)). See [AGENTS.md](AGENTS.md) for development guidelines.
