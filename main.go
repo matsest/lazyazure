@@ -21,11 +21,7 @@ func printVersion() {
 		displayCommit = displayCommit[:7]
 	}
 
-	if version == "dev" {
-		fmt.Printf("lazyazure %s (%s)\n", version, displayCommit)
-	} else {
-		fmt.Printf("lazyazure %s\n", version)
-	}
+	fmt.Printf("lazyazure %s (%s)\n", version, displayCommit)
 }
 
 // Version info - set by GoReleaser during build
