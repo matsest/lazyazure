@@ -112,6 +112,11 @@ See other methods under [authentication](#Authentication).
 - **Enter** (on resource group): Load resources in that resource group
 - **Enter** (on resource): View resource details and focus right panel
 
+**Mouse Support:**
+- **Click panels**: Focus any panel (Subscriptions, Resource Groups, Resources, or Details)
+- **Click list items**: Select and trigger Enter action (same as pressing Enter)
+- **Click tabs**: Switch between Summary and JSON views in the details panel
+
 **Search:**
 - **/**: Activate search mode for current panel (matches name, location, type, etc.)
 - **Characters** (in search): Type to filter list
