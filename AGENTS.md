@@ -149,7 +149,7 @@ az login  # Optional - only one of many auth methods
 When implementing features or fixes:
 - **New domain models?** Add JSON serialization tests in `pkg/domain/`
 - **New Azure client methods?** Add client tests in `pkg/azure/`
-- **New GUI features?** Add tests in `pkg/gui/` (or at minimum, test manually)
+- **New GUI features?** Add tests in `pkg/gui/` if applicable and run the automated TUI testing with tmux
 - **Bug fixes?** Add a test that would have caught the bug
 
 Run tests frequently:
@@ -162,6 +162,20 @@ Key test files:
 - `pkg/azure/client_test.go` - Azure client tests
 - `pkg/gui/gui_test.go` - GUI tests
 - `pkg/domain/domain_test.go` - Domain model tests (JSON tags, helpers)
+
+### 6.1 Automated TUI Testing with tmux
+
+For programmatic TUI testing using tmux, see [docs/TUI_TESTING.md](docs/TUI_TESTING.md).
+
+**Capabilities:**
+- **Text-based testing**: Capture pane content for assertions (works in any environment including CI/CD)
+- **Screenshot testing**: Visual verification using `grim` (Wayland) or `import` (X11) - requires display
+- **Subagent delegation**: Automated testing via tmux scripting
+
+**Prerequisites:**
+- Required: `tmux`
+- For screenshots: `grim` (Wayland), `import` (ImageMagick, X11), or `scrot`
+- Note: Screenshot tools require visible terminal window and active display server
 
 ### 7. Common Issues and Fixes
 
@@ -203,6 +217,8 @@ go test ./pkg/...
 ### 9. File Organization
 
 ```
+docs/
+└── TUI_TESTING.md           # TUI testing documentation with tmux
 pkg/
 ├── azure/          # Azure SDK clients
 │   ├── client.go            # Azure SDK wrapper with DefaultAzureCredential
@@ -340,11 +356,9 @@ Before finishing a session or committing changes:
 - [ ] Debug logging is properly guarded with `LAZYAZURE_DEBUG` check
 - [ ] No mutex deadlocks introduced (verify lock patterns)
 - [ ] **Documentation updated**:
-  - [ ] README.md - File organization section updated if new packages added
   - [ ] AGENTS.md - File organization section, relevant guidelines, and checklist updated
   - [ ] New features/patterns documented in appropriate sections
 - [ ] **File organization documented**:
-  - [ ] New packages added to README architecture diagram
   - [ ] New packages added to AGENTS.md section 9 (File Organization)
   - [ ] Any new patterns or conventions documented
 
@@ -358,7 +372,7 @@ Before finishing a session or committing changes:
 4. **Ghostty**: Preferred terminal for testing
 5. **Debug logs are essential**: But must be opt-in for production
 
-## Terminal Requirements and Testing
+## Terminal Requirements
 
 ### Required Terminal Features
 
@@ -366,16 +380,6 @@ The application requires terminals that support:
 - **Unicode box-drawing characters**: `┌─┐│└┘` for panel borders
 - **256-color ANSI support**: For green color-coded keys (ANSI 256-color code 114) and JSON syntax highlighting
 - **ANSI escape sequences**: For bold text and color resets (`\x1b[0m`)
-
-### Testing Checklist
-
-Ask the user to verify tests when changing the UI. Some example criterias to test:
-
-- [ ] Test in a real terminal (not IDE console)
-- [ ] Verify colors render correctly (green keys should be visible)
-- [ ] Verify box-drawing characters display properly (no `?` or garbage characters)
-- [ ] Test on minimum terminal size (80x24 should work, though larger is better)
-- [ ] Verify clipboard operations work on target platform
 
 ### Platform-Specific Considerations
 

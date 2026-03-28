@@ -181,45 +181,6 @@ cat ~/.lazyazure/debug.log
 
 Linux clipboard requires `xclip` or `xsel` (X11) or `wl-copy` (Wayland). macOS and Windows have native clipboard support. If using WSL it should pick up the Windows clipboard.
 
-## Architecture
-
-```
-lazyazure/
-├── main.go                       # Entry point
-├── PLAN.md                       # Full implementation plan
-├── pkg/
-│   ├── azure/
-│   │   ├── client.go            # Azure SDK wrapper
-│   │   ├── factory.go           # Client factory for dependency injection
-│   │   ├── subscriptions.go     # Subscription operations
-│   │   ├── resourcegroups.go    # Resource group operations
-│   │   └── resources.go         # Generic resource operations
-│   ├── demo/
-│   │   ├── client.go            # Demo client (mock Azure data)
-│   │   └── data.go              # Demo data structures
-│   ├── domain/
-│   │   ├── user.go              # User domain model
-│   │   ├── subscription.go      # Subscription domain model
-│   │   ├── resourcegroup.go     # ResourceGroup domain model
-│   │   └── resource.go          # Generic Resource domain model
-│   ├── resources/
-│   │   ├── display_names.go     # Resource type display name loader
-│   │   ├── display_names.json   # Human-readable resource type mappings
-│   │   └── display_names_test.go # Display name tests
-│   ├── gui/
-│   │   ├── gui.go               # Main TUI controller
-│   │   ├── interfaces.go        # Client interfaces
-│   │   └── panels/
-│   │       └── filtered_list.go # Generic filtered list
-│   ├── tasks/
-│   │   └── tasks.go             # Async task management
-│   └── utils/
-│       ├── logger.go            # Debug logging utility
-│       ├── clipboard.go         # Clipboard operations
-│       ├── portal_urls.go       # Azure Portal URL generation
-│       └── portal_urls_test.go  # Portal URL tests
-```
-
 ## Project Status
 
 - **Phase 1 (MVP)**: ✅ Complete - Auth & subscriptions working
