@@ -477,6 +477,36 @@ Azure resource types (e.g., "Microsoft.Compute/virtualMachines") are mapped to h
 
 **CRITICAL: Complete this checklist BEFORE committing any changes.**
 
+## Third-Party Dependencies and License Compliance
+
+When adding new third-party dependencies to the project:
+
+### Required Actions
+1. **Add dependency to go.mod**: `go get <package>`
+2. **Verify license compatibility**: Ensure the license is compatible with this project's license
+3. **Update THIRD-PARTY-NOTICES.txt**: Add the complete license text for the new dependency
+   - **MIT**: Include full permission notice with copyright
+   - **BSD 2/3-Clause**: Include full text with conditions and disclaimer
+   - **Apache 2.0**: Include full license text
+   - **Other licenses**: Include full license text as required by the license terms
+
+### Format in THIRD-PARTY-NOTICES.txt
+Follow the existing format:
+```
+--------------------------------------------------------------------------------
+<Package Name> (<repository URL>)
+License: <License Name>
+Copyright (c) <Year> <Author/Company>
+--------------------------------------------------------------------------------
+
+<Full license text here>
+```
+
+### Important Notes
+- **Full license text required**: Just listing the package name and license type is NOT sufficient for binary distribution compliance
+- **Transitive dependencies**: Only need to list URLs; full texts not required unless they are direct dependencies
+- **When in doubt**: Include the full license text - it's always safer
+
 Before finishing a session or committing changes:
 
 - [ ] Code builds without errors: `go build .`
@@ -486,6 +516,9 @@ Before finishing a session or committing changes:
 - [ ] Modules are tidy: `go mod tidy`
 - [ ] Debug logging is properly guarded with `LAZYAZURE_DEBUG` check
 - [ ] No mutex deadlocks introduced (verify lock patterns)
+- [ ] **Third-party dependencies updated**:
+  - [ ] THIRD-PARTY-NOTICES.txt updated with full license text for any new dependencies
+  - [ ] License compatibility verified for new dependencies
 - [ ] **Documentation updated**:
   - [ ] AGENTS.md - File organization section, relevant guidelines, and checklist updated
   - [ ] New features/patterns documented in appropriate sections
