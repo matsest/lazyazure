@@ -7,7 +7,7 @@
 <img src="https://img.shields.io/badge/platform-windows%20%7C%20linux%20%7C%20macos-blue?style=flat-square" alt="Platform">
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://github.com/matsest/lazyazure/blob/main/LICENSE)
 
-A TUI application for Azure resource management, inspired by [lazydocker](https://github.com/jesseduffield/lazydocker). Browse Azure subscriptions, resource groups, and resources with an interactive terminal interface.
+A TUI application for viewing Azure resources, inspired by [lazydocker](https://github.com/jesseduffield/lazydocker). Browse Azure subscriptions, resource groups, and resources with an interactive terminal interface.
 
 > **About This Project**: This project is vibe-coded with [OpenCode](https://opencode.ai). It is provided as-is without warranties ([MIT License](./LICENSE)). See [AGENTS.md](AGENTS.md) for development guidelines.
 
@@ -239,9 +239,13 @@ See [PLAN.md](./PLAN.md) for the full implementation roadmap.
   - `armsubscriptions` - Subscription management
   - `armresources` - Resource management
 
+You can see all dependencies in [dependency graph](https://github.com/matsest/lazyazure/network/dependencies).
+
 ## Security
 
 LazyAzure uses Microsoft's official [Azure SDK for Go](https://github.com/Azure/azure-sdk-for-go) with DefaultAzureCredential for authentication, supporting Azure CLI, Azure PowerShell, Managed Identity, environment variables, and other official Azure authentication methods. The application does not store credentials or sensitive data to disk; all tokens are handled in-memory only during runtime. No telemetry or logs is collected. Communication with Azure APIs uses HTTPS/TLS exclusively. [Debug logging](#debug-logging) is disabled by default and can be enabled via the `LAZYAZURE_DEBUG`` environment variable, which optionally logs to a local file in a users home directory. The repository is open source ([MIT License](./LICENSE)) and uses [Dependabot](./.github/dependabot.yml) for automated dependency/security updates and GitHub's [CodeQL](https://docs.github.com/en/code-security/concepts/code-scanning/codeql/about-code-scanning-with-codeql) for security analysis.
+
+If you have any findings, please [report a vulnerability](https://github.com/matsest/lazyazure/security/advisories/new).
 
 ## Contributing
 
@@ -255,3 +259,5 @@ Please check [existing issues](../../issues) first to avoid duplicates.
 ## License
 
 [MIT](LICENSE)
+
+[Third party licenses](./THIRD-PARTY-NOTICES.txt)
