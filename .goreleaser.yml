@@ -86,7 +86,7 @@ release:
     ### Verify Checksum (optional)
     ```bash
     curl -LO https://github.com/matsest/lazyazure/releases/download/{{ .Tag }}/lazyazure_{{ .Version }}_checksums.txt
-    sha256sum -c lazyazure_{{ .Version }}_checksums.txt
+    sha256sum --ignore-missing -c lazyazure_{{ .Version }}_checksums.txt
     ```
 
 # Disable source archives
