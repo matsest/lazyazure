@@ -67,14 +67,14 @@ release:
     ```bash
     curl -LO https://github.com/matsest/lazyazure/releases/download/{{ .Tag }}/lazyazure_{{ .Version }}_darwin_arm64
     chmod +x lazyazure_{{ .Version }}_darwin_arm64
-    sudo mv lazyazure_{{ .Version }}_darwin_arm64 /usr/local/bin/lazyazure
+    mv lazyazure_{{ .Version }}_darwin_arm64 ~/.local/bin/lazyazure
     ```
-    
+
     ### Linux
     ```bash
     curl -LO https://github.com/matsest/lazyazure/releases/download/{{ .Tag }}/lazyazure_{{ .Version }}_linux_amd64
     chmod +x lazyazure_{{ .Version }}_linux_amd64
-    sudo mv lazyazure_{{ .Version }}_linux_amd64 /usr/local/bin/lazyazure
+    mv lazyazure_{{ .Version }}_linux_amd64 ~/.local/bin/lazyazure
     ```
     
     ### Windows
