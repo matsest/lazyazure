@@ -32,7 +32,7 @@ checksum:
 
 changelog:
   use: github
-  format: "{{ .Message }}"
+  format: "{{ .Message }} ({{ .Hash }})"
   sort: asc
   filters:
     exclude:
@@ -51,6 +51,9 @@ changelog:
       order: 999
 
 release:
+  header: |
+    [Full Changelog](https://github.com/matsest/lazyazure/compare/{{ .PreviousTag }}...{{ .Tag }})
+
   # Create a draft release
   draft: false
   # Prerelease for versions like v0.1.0-alpha1
