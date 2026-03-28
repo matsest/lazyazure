@@ -16,7 +16,7 @@ A TUI application for viewing Azure resources, inspired by [lazydocker](https://
 ## Features
 
 - **Full Resource Hierarchy**: Browse Subscriptions → Resource Groups → Resources
-- **Multiple Authentication Methods**: Supports Azure CLI, Managed Identity, Environment Variables, and more
+- **Multiple Authentication Methods**: Supports Azure CLI, Azure PowerShell, Managed Identity, Environment Variables, and more
 - **Rich Detail Views**: 
   - Summary view with color-coded keys and formatted nested properties
   - JSON view with syntax highlighting
