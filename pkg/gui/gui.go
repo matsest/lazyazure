@@ -114,7 +114,10 @@ func (gui *Gui) Run() error {
 
 	// Set up color scheme (green border for active/focused elements)
 	gui.g.SelFgColor = gocui.ColorGreen
+	gui.g.SelBgColor = gocui.ColorDefault
 	gui.g.SelFrameColor = gocui.ColorGreen
+	// Don't set g.FgColor - let inactive titles use default (white)
+	// Don't set g.BgColor - let it use the terminal default
 
 	// Set up initial layout
 	utils.Log("Gui.Run: Setting up views...")
@@ -197,7 +200,6 @@ func (gui *Gui) setupViews() error {
 		v.Title = " Subscriptions "
 		v.Highlight = true
 		v.SelBgColor = gocui.ColorBlue
-		v.SelFgColor = gocui.ColorWhite | gocui.AttrBold
 		v.Frame = true
 		v.FrameColor = gocui.ColorWhite
 		gui.subscriptionsView = v
@@ -215,7 +217,6 @@ func (gui *Gui) setupViews() error {
 		v.Title = " Resource Groups "
 		v.Highlight = true
 		v.SelBgColor = gocui.ColorBlue
-		v.SelFgColor = gocui.ColorWhite | gocui.AttrBold
 		v.Frame = true
 		v.FrameColor = gocui.ColorWhite
 		gui.resourceGroupsView = v
@@ -233,7 +234,6 @@ func (gui *Gui) setupViews() error {
 		v.Title = " Resources "
 		v.Highlight = true
 		v.SelBgColor = gocui.ColorBlue
-		v.SelFgColor = gocui.ColorWhite | gocui.AttrBold
 		v.Frame = true
 		v.FrameColor = gocui.ColorWhite
 		gui.resourcesView = v
@@ -244,7 +244,9 @@ func (gui *Gui) setupViews() error {
 		if !gocui.IsUnknownView(err) {
 			return err
 		}
-		v.Title = " Details "
+		// Use gocui's native tab support instead of title
+		v.Tabs = []string{"Summary", "JSON"}
+		v.TabIndex = 0
 		v.Wrap = true
 		// Enable scrolling
 		v.Autoscroll = false
@@ -253,6 +255,14 @@ func (gui *Gui) setupViews() error {
 		v.Highlight = false
 		v.Frame = true
 		v.FrameColor = gocui.ColorWhite
+		// Tab colors: selected tab uses SelFgColor (green), inactive uses FgColor (white)
+		// SelBgColor and BgColor set to default to avoid background highlight
+		// Include AttrBold in SelFgColor so that when gocui subtracts it for non-current views,
+		// we end up with just the color without bold
+		v.SelFgColor = gocui.ColorGreen | gocui.AttrBold
+		v.SelBgColor = gocui.ColorDefault
+		v.FgColor = gocui.ColorWhite
+		v.BgColor = gocui.ColorDefault
 		gui.mainView = v
 	}
 
@@ -1741,46 +1751,33 @@ func (gui *Gui) refreshMainPanel() {
 
 	// Build content lines
 	var lines []string
-	var title string
 
 	// Determine what to display based on what's selected and active panel
 	if selectedRes != nil && (activePanel == "resources" || activePanel == "main") {
 		// Show resource details
 		if tabIndex == 0 {
-			// Summary tab
-			title = " Details [Summary] "
 			lines = gui.buildResourceSummaryLines(selectedRes, activePanel == "resources")
 		} else {
-			// JSON tab
-			title = " Details [JSON] "
 			lines = gui.buildResourceJSONLines(selectedRes, activePanel == "resources")
 		}
 	} else if selectedRG != nil && (activePanel == "resourcegroups" || activePanel == "resources") {
 		// Show resource group details
 		if tabIndex == 0 {
-			// Summary tab
-			title = " Details [Summary] "
 			lines = gui.buildRGSummaryLines(selectedRG)
 		} else {
-			// JSON tab
-			title = " Details [JSON] "
 			lines = gui.buildRGJSONLines(selectedRG)
 		}
 	} else if selectedSub != nil {
 		// Show subscription details
 		if tabIndex == 0 {
-			// Summary tab
-			title = " Details [Summary] "
 			lines = gui.buildSubSummaryLines(selectedSub)
 		} else {
-			// JSON tab
-			title = " Details [JSON] "
 			lines = gui.buildSubJSONLines(selectedSub)
 		}
 	}
 
-	// Update the view
-	gui.mainView.Title = title
+	// Update the view - gocui handles tab rendering via Tabs/TabIndex
+	gui.mainView.TabIndex = tabIndex
 	gui.mainView.Clear()
 
 	// Store content for search highlighting
