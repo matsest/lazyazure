@@ -336,6 +336,7 @@ Before finishing a session or committing changes:
 - [ ] Tests have been updated or added per the guideline in this file
 - [ ] Tests pass: `go test ./pkg/...`
 - [ ] Code is properly formatted: `gofmt -l .` returns empty
+- [ ] Modules are tidy: `go mod tidy`
 - [ ] Debug logging is properly guarded with `LAZYAZURE_DEBUG` check
 - [ ] No mutex deadlocks introduced (verify lock patterns)
 - [ ] **Documentation updated**:
