@@ -175,7 +175,9 @@ The following features are planned but not yet implemented:
 ### Navigation Improvements
 - `Esc` or `h` to navigate back up hierarchy
 - Open portal link in browser (cross-platform)
-- Mouse navigation (click to change focus between boxes and items)
+- ✅ Mouse navigation (click to change focus between boxes and items)
+- ✅ Click list items to trigger Enter action
+- ✅ Click Summary/JSON tabs to switch views
 
 ### Caching
 - In-memory cache for API responses

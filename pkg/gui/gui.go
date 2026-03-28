@@ -112,6 +112,10 @@ func (gui *Gui) Run() error {
 	gui.g = g
 	utils.Log("Gui.Run: gocui created successfully")
 
+	// Enable mouse support
+	gui.g.Mouse = true
+	utils.Log("Gui.Run: Mouse support enabled")
+
 	// Set up color scheme (green border for active/focused elements)
 	gui.g.SelFgColor = gocui.ColorGreen
 	gui.g.SelBgColor = gocui.ColorDefault
@@ -302,6 +306,25 @@ func (gui *Gui) setupKeybindings() error {
 		}
 	}
 	utils.Log("setupKeybindings: Quit keybindings set")
+
+	// Mouse click to focus panels (list panels)
+	panels := []string{"subscriptions", "resourcegroups", "resources"}
+	for _, panel := range panels {
+		if err := gui.g.SetKeybinding(panel, gocui.MouseLeft, gocui.ModNone, gui.onPanelClick); err != nil {
+			return err
+		}
+	}
+	utils.Log("setupKeybindings: Mouse click keybindings set")
+
+	// Mouse click for main panel (with coordinate support for tabs)
+	if err := gui.g.SetViewClickBinding(&gocui.ViewMouseBinding{
+		ViewName: "main",
+		Key:      gocui.MouseLeft,
+		Handler:  gui.onMainViewClick,
+	}); err != nil {
+		return err
+	}
+	utils.Log("setupKeybindings: Main panel click binding set")
 
 	// Subscriptions panel navigation
 	if err := gui.g.SetKeybinding("subscriptions", gocui.KeyArrowDown, gocui.ModNone, gui.nextSub); err != nil {
@@ -1457,6 +1480,110 @@ func (gui *Gui) switchPanelReverse(g *gocui.Gui, v *gocui.View) error {
 	gui.updateStatus()
 
 	utils.Log("switchPanelReverse: switched successfully to %s", nextView)
+	return nil
+}
+
+// onPanelClick handles mouse clicks on panels to focus them
+func (gui *Gui) onPanelClick(g *gocui.Gui, v *gocui.View) error {
+	if v == nil {
+		return nil
+	}
+
+	viewName := v.Name()
+	utils.Log("onPanelClick: Clicked on panel %s", viewName)
+
+	// Map view names to panel names
+	panelName := viewName
+	switch viewName {
+	case "subscriptions", "resourcegroups", "resources":
+		// These are the focusable list panels
+	default:
+		// Not a focusable panel (main is handled separately via onMainViewClick)
+		return nil
+	}
+
+	// Set the current view and update active panel
+	if _, err := gui.g.SetCurrentView(viewName); err != nil {
+		utils.Log("onPanelClick: ERROR setting current view: %v", err)
+		return err
+	}
+
+	gui.mu.Lock()
+	gui.activePanel = panelName
+	gui.mu.Unlock()
+
+	// Update visual indicators
+	gui.updatePanelTitles()
+	gui.updateStatus()
+
+	// For list panels, also trigger the enter action (as if user pressed Enter on the item)
+	// gocui automatically positions the cursor at the clicked line
+	switch viewName {
+	case "subscriptions":
+		_, cy := v.Cursor()
+		if _, ok := gui.subList.Get(cy); ok {
+			gui.updateSubscriptionSelection(v)
+			gui.refreshMainPanel()
+			return gui.onSubEnter(g, v)
+		}
+	case "resourcegroups":
+		_, cy := v.Cursor()
+		if _, ok := gui.rgList.Get(cy); ok {
+			gui.updateRGSelection(v)
+			gui.refreshMainPanel()
+			return gui.onRGEnter(g, v)
+		}
+	case "resources":
+		_, cy := v.Cursor()
+		if _, ok := gui.resList.Get(cy); ok {
+			gui.updateResSelection(v)
+			gui.refreshMainPanel()
+			return gui.onResEnter(g, v)
+		}
+	}
+
+	utils.Log("onPanelClick: Focused panel %s", panelName)
+	return nil
+}
+
+// onMainViewClick handles mouse clicks on the main view, including tab clicks
+func (gui *Gui) onMainViewClick(opts gocui.ViewMouseBindingOpts) error {
+	v, err := gui.g.View("main")
+	if err != nil {
+		return err
+	}
+
+	utils.Log("onMainViewClick: Clicked on main panel at (%d, %d)", opts.X, opts.Y)
+
+	// Check if click was on a tab
+	tabIdx := v.GetClickedTabIndex(opts.X)
+	if tabIdx >= 0 {
+		utils.Log("onMainViewClick: Clicked on tab %d", tabIdx)
+		gui.mu.Lock()
+		gui.tabIndex = tabIdx
+		gui.mu.Unlock()
+		gui.refreshMainPanel()
+		// Still focus the panel even when clicking a tab
+		if _, err := gui.g.SetCurrentView("main"); err != nil {
+			return err
+		}
+		gui.mu.Lock()
+		gui.activePanel = "main"
+		gui.mu.Unlock()
+		gui.updatePanelTitles()
+		gui.updateStatus()
+		return nil
+	}
+
+	// Not a tab click, just focus the panel
+	if _, err := gui.g.SetCurrentView("main"); err != nil {
+		return err
+	}
+	gui.mu.Lock()
+	gui.activePanel = "main"
+	gui.mu.Unlock()
+	gui.updatePanelTitles()
+	gui.updateStatus()
 	return nil
 }
 

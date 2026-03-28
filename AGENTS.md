@@ -108,8 +108,18 @@ The UI uses a 4-panel stacked layout on the left side:
 #### Panel Focus
 - Use `activePanel` field to track which panel has focus
 - Visual indicator: Frame color (green = active, white = inactive)
-- Switch panels with `Tab` key
+- Switch panels with `Tab` key or **mouse click**
+- Click a list item to select it and trigger the Enter action (loads next panel)
+- Click Summary/JSON tabs in the main panel to switch views
 - Each panel has independent navigation keybindings
+
+#### Mouse Support
+- Mouse support is enabled via `gui.g.Mouse = true`
+- List panels use standard keybindings with `gocui.MouseLeft`
+- Main panel uses `SetViewClickBinding` to detect tab clicks via `GetClickedTabIndex`
+- Clicking sets focus and triggers appropriate actions:
+  - **Subscriptions/Resource Groups/Resources**: Selects item + Enter action
+  - **Main panel tabs**: Switches between Summary/JSON views
 
 #### Panel Alignment
 - Calculate Y coordinates carefully to align panel bottoms
