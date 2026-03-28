@@ -342,6 +342,13 @@ func (gui *Gui) setupKeybindings() error {
 	if err := gui.g.SetKeybinding("subscriptions", gocui.KeyEnter, gocui.ModNone, gui.onSubEnter); err != nil {
 		return err
 	}
+	// Mouse wheel scrolling for subscriptions panel
+	if err := gui.g.SetKeybinding("subscriptions", gocui.MouseWheelUp, gocui.ModNone, gui.prevSub); err != nil {
+		return err
+	}
+	if err := gui.g.SetKeybinding("subscriptions", gocui.MouseWheelDown, gocui.ModNone, gui.nextSub); err != nil {
+		return err
+	}
 	utils.Log("setupKeybindings: Subscriptions navigation set")
 
 	// Resource Groups panel navigation
@@ -360,6 +367,13 @@ func (gui *Gui) setupKeybindings() error {
 	if err := gui.g.SetKeybinding("resourcegroups", gocui.KeyEnter, gocui.ModNone, gui.onRGEnter); err != nil {
 		return err
 	}
+	// Mouse wheel scrolling for resource groups panel
+	if err := gui.g.SetKeybinding("resourcegroups", gocui.MouseWheelUp, gocui.ModNone, gui.prevRG); err != nil {
+		return err
+	}
+	if err := gui.g.SetKeybinding("resourcegroups", gocui.MouseWheelDown, gocui.ModNone, gui.nextRG); err != nil {
+		return err
+	}
 	utils.Log("setupKeybindings: Resource groups navigation set")
 
 	// Resources panel navigation
@@ -376,6 +390,13 @@ func (gui *Gui) setupKeybindings() error {
 		return err
 	}
 	if err := gui.g.SetKeybinding("resources", gocui.KeyEnter, gocui.ModNone, gui.onResEnter); err != nil {
+		return err
+	}
+	// Mouse wheel scrolling for resources panel
+	if err := gui.g.SetKeybinding("resources", gocui.MouseWheelUp, gocui.ModNone, gui.prevRes); err != nil {
+		return err
+	}
+	if err := gui.g.SetKeybinding("resources", gocui.MouseWheelDown, gocui.ModNone, gui.nextRes); err != nil {
 		return err
 	}
 	utils.Log("setupKeybindings: Resources navigation set")
@@ -452,6 +473,13 @@ func (gui *Gui) setupKeybindings() error {
 		return err
 	}
 	if err := gui.g.SetKeybinding("main", gocui.KeyPgup, gocui.ModNone, gui.scrollPageUp); err != nil {
+		return err
+	}
+	// Mouse wheel scrolling for main panel
+	if err := gui.g.SetKeybinding("main", gocui.MouseWheelUp, gocui.ModNone, gui.scrollUp); err != nil {
+		return err
+	}
+	if err := gui.g.SetKeybinding("main", gocui.MouseWheelDown, gocui.ModNone, gui.scrollDown); err != nil {
 		return err
 	}
 	// Escape to clear main panel search
