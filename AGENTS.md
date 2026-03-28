@@ -273,7 +273,9 @@ pkg/
 │       ├── filtered_list.go      # Generic filtered list component
 │       ├── filtered_list_test.go # Filtered list tests
 │       ├── search_bar.go         # Search bar UI component
-│       └── search_bar_test.go    # Search bar tests
+│       ├── search_bar_test.go    # Search bar tests
+│       ├── main_panel_search.go  # Main panel search (highlighting)
+│       └── main_panel_search_test.go # Main panel search tests
 ├── tasks/          # Async task management
 │   ├── tasks.go
 │   └── tasks_test.go        # Task manager tests
@@ -389,6 +391,50 @@ for _, display := range subList.GetFilteredDisplayStrings() {
 - `Ctrl+W` - Delete last word
 - `Enter` - Confirm and exit search mode
 - `Escape` - Cancel and clear filter
+
+### Main Panel Search
+
+The main/details panel (right side) has a different search mode that **highlights** matching lines instead of filtering items.
+
+#### Implementation (`pkg/gui/panels/main_panel_search.go`)
+
+**Key differences from list panel search:**
+- Highlights matching lines with light grey background (ANSI 250) for other matches
+- Current match highlighted with yellow background (ANSI 226) for visibility
+- Shows all content, just highlights matches
+- Supports navigation between matches with `n`/`N` keys
+- Clears search when switching to a different resource
+
+**Usage pattern:**
+```go
+// When rendering content to main panel
+lines := gui.buildResourceSummaryLines(resource)
+gui.mainPanelSearch.SetContent(lines)
+
+// Render with or without highlights
+if gui.mainPanelSearch.IsActive() {
+    highlightedLines := gui.mainPanelSearch.GetHighlightedContent()
+    // render highlighted lines
+} else {
+    // render normal lines
+}
+```
+
+**Important considerations:**
+- Store content lines before applying highlights
+- Search is case-insensitive
+- JSON content has existing ANSI codes from Chroma - search works on the visible text
+- Other matches get wrapped with `\x1b[48;5;250m` (light grey bg)
+- Current match gets wrapped with `\x1b[48;5;226m` (yellow bg)
+- Both use `\x1b[0m` (reset)
+- Use `NextMatch()`/`PrevMatch()` to navigate and scroll view to match position
+
+#### Main Panel Search Keybindings (when in main panel)
+- `/` - Start search
+- `n` - Jump to next match
+- `N` - Jump to previous match
+- `Enter` - Confirm and exit search input mode
+- `Escape` - Clear search and remove highlights
 
 ### Resource Type Display Names
 

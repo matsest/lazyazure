@@ -234,10 +234,12 @@ lazyazure/
 │   │   ├── gui.go               # Main GUI controller with all TUI logic
 │   │   ├── gui_test.go          # GUI tests
 │   │   └── panels/
-│   │       ├── filtered_list.go      # Generic filtered list component
-│   │       ├── filtered_list_test.go # Filtered list tests
-│   │       ├── search_bar.go         # Search bar UI component
-│   │       └── search_bar_test.go    # Search bar tests
+│   │       ├── filtered_list.go          # Generic filtered list component
+│   │       ├── filtered_list_test.go     # Filtered list tests
+│   │       ├── search_bar.go             # Search bar UI component
+│   │       ├── search_bar_test.go        # Search bar tests
+│   │       ├── main_panel_search.go      # Main panel search (highlighting)
+│   │       └── main_panel_search_test.go # Main panel search tests
 │   ├── tasks/
 │   │   ├── tasks.go             # Async task management
 │   │   └── tasks_test.go        # Task manager tests

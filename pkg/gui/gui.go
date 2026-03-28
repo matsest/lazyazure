@@ -73,8 +73,10 @@ type Gui struct {
 	resList *panels.FilteredList[*domain.Resource]
 
 	// Search state
-	searchBar   *panels.SearchBar
-	isSearching bool
+	searchBar       *panels.SearchBar
+	isSearching     bool
+	searchTarget    string // "list" or "main" - tracks which search mode is active
+	mainPanelSearch *panels.MainPanelSearch
 
 	mu sync.RWMutex
 }
@@ -82,14 +84,15 @@ type Gui struct {
 // NewGui creates a new GUI instance
 func NewGui(azureClient AzureClient, clientFactory AzureClientFactory) (*Gui, error) {
 	return &Gui{
-		azureClient:   azureClient,
-		clientFactory: clientFactory,
-		taskManager:   tasks.NewTaskManager(),
-		tabIndex:      0,
-		activePanel:   "subscriptions",
-		subList:       panels.NewFilteredList[*domain.Subscription](),
-		rgList:        panels.NewFilteredList[*domain.ResourceGroup](),
-		resList:       panels.NewFilteredList[*domain.Resource](),
+		azureClient:     azureClient,
+		clientFactory:   clientFactory,
+		taskManager:     tasks.NewTaskManager(),
+		tabIndex:        0,
+		activePanel:     "subscriptions",
+		subList:         panels.NewFilteredList[*domain.Subscription](),
+		rgList:          panels.NewFilteredList[*domain.ResourceGroup](),
+		resList:         panels.NewFilteredList[*domain.Resource](),
+		mainPanelSearch: panels.NewMainPanelSearch(),
 	}, nil
 }
 
@@ -412,6 +415,17 @@ func (gui *Gui) setupKeybindings() error {
 	if err := gui.g.SetKeybinding("main", gocui.KeyPgup, gocui.ModNone, gui.scrollPageUp); err != nil {
 		return err
 	}
+	// Escape to clear main panel search
+	if err := gui.g.SetKeybinding("main", gocui.KeyEsc, gocui.ModNone, gui.onMainPanelClearSearch); err != nil {
+		return err
+	}
+	// n/N to navigate matches in main panel
+	if err := gui.g.SetKeybinding("main", 'n', gocui.ModNone, gui.onMainPanelSearchNext); err != nil {
+		return err
+	}
+	if err := gui.g.SetKeybinding("main", 'N', gocui.ModNone, gui.onMainPanelSearchPrev); err != nil {
+		return err
+	}
 	utils.Log("setupKeybindings: Main panel scrolling set")
 
 	utils.Log("setupKeybindings: All keybindings set successfully")
@@ -429,15 +443,16 @@ func (gui *Gui) quit(g *gocui.Gui, v *gocui.View) error {
 func (gui *Gui) startSearch(g *gocui.Gui, v *gocui.View) error {
 	utils.Log("startSearch: Activating search mode")
 
-	// Don't start search if already searching or in main panel
 	gui.mu.RLock()
 	activePanel := gui.activePanel
 	gui.mu.RUnlock()
 
 	if activePanel == "main" {
-		return nil
+		// Start main panel search (highlight mode)
+		return gui.startMainPanelSearch(g, v)
 	}
 
+	// Start list panel search (filter mode)
 	if gui.searchBar == nil {
 		gui.searchBar = panels.NewSearchBar(gui.g, gui.onSearchChanged, gui.onSearchCancel, gui.onSearchConfirm)
 	}
@@ -448,6 +463,7 @@ func (gui *Gui) startSearch(g *gocui.Gui, v *gocui.View) error {
 	}
 
 	gui.isSearching = true
+	gui.searchTarget = "list"
 	utils.Log("startSearch: Setting up search keybindings...")
 	gui.setupSearchKeybindings()
 	utils.Log("startSearch: Search keybindings setup complete")
@@ -455,6 +471,75 @@ func (gui *Gui) startSearch(g *gocui.Gui, v *gocui.View) error {
 	utils.Log("startSearch: Status updated, search mode ready")
 
 	return nil
+}
+
+// startMainPanelSearch activates search mode for the main/details panel
+func (gui *Gui) startMainPanelSearch(g *gocui.Gui, v *gocui.View) error {
+	utils.Log("startMainPanelSearch: Activating main panel search")
+
+	// Create search bar for main panel
+	if gui.searchBar == nil {
+		gui.searchBar = panels.NewSearchBar(gui.g, gui.onMainPanelSearchChanged, gui.onMainPanelSearchCancel, gui.onMainPanelSearchConfirm)
+	} else {
+		// Update callbacks for main panel search
+		gui.searchBar = panels.NewSearchBar(gui.g, gui.onMainPanelSearchChanged, gui.onMainPanelSearchCancel, gui.onMainPanelSearchConfirm)
+	}
+
+	if err := gui.searchBar.Show(); err != nil {
+		utils.Log("startMainPanelSearch: ERROR showing search bar: %v", err)
+		return err
+	}
+
+	gui.isSearching = true
+	gui.searchTarget = "main"
+	gui.setupMainPanelSearchKeybindings()
+	gui.updateStatus()
+	utils.Log("startMainPanelSearch: Main panel search mode ready")
+
+	return nil
+}
+
+// setupMainPanelSearchKeybindings binds keys for main panel search
+func (gui *Gui) setupMainPanelSearchKeybindings() {
+	utils.Log("setupMainPanelSearchKeybindings: Setting up main panel search keybindings")
+
+	// Character input - a-z
+	for ch := 'a'; ch <= 'z'; ch++ {
+		gui.g.SetKeybinding("search", ch, gocui.ModNone, gui.makeMainPanelSearchRuneHandler(ch))
+	}
+	// Character input - A-Z
+	for ch := 'A'; ch <= 'Z'; ch++ {
+		gui.g.SetKeybinding("search", ch, gocui.ModNone, gui.makeMainPanelSearchRuneHandler(ch))
+	}
+	// Numbers
+	for ch := '0'; ch <= '9'; ch++ {
+		gui.g.SetKeybinding("search", ch, gocui.ModNone, gui.makeMainPanelSearchRuneHandler(ch))
+	}
+	// Special characters
+	specialChars := []rune{'-', '_', '.', '@', '/', '(', ')'}
+	for _, ch := range specialChars {
+		gui.g.SetKeybinding("search", ch, gocui.ModNone, gui.makeMainPanelSearchRuneHandler(ch))
+	}
+
+	// Space
+	gui.g.SetKeybinding("search", gocui.KeySpace, gocui.ModNone, gui.onMainPanelSearchSpace)
+	// Backspace
+	gui.g.SetKeybinding("search", gocui.KeyBackspace, gocui.ModNone, gui.onMainPanelSearchBackspace)
+	gui.g.SetKeybinding("search", gocui.KeyBackspace2, gocui.ModNone, gui.onMainPanelSearchBackspace)
+	// Ctrl+U - clear all
+	gui.g.SetKeybinding("search", gocui.KeyCtrlU, gocui.ModNone, gui.onMainPanelSearchClear)
+	// Ctrl+W - delete word
+	gui.g.SetKeybinding("search", gocui.KeyCtrlW, gocui.ModNone, gui.onMainPanelSearchDeleteWord)
+	// Enter - confirm
+	gui.g.SetKeybinding("search", gocui.KeyEnter, gocui.ModNone, gui.onMainPanelSearchEnter)
+	// Escape - cancel (handled by unified handler)
+	gui.g.SetKeybinding("search", gocui.KeyEsc, gocui.ModNone, gui.onSearchEscapeUnified)
+	// n - next match
+	gui.g.SetKeybinding("search", 'n', gocui.ModNone, gui.onMainPanelSearchNext)
+	// N - previous match
+	gui.g.SetKeybinding("search", 'N', gocui.ModNone, gui.onMainPanelSearchPrev)
+
+	utils.Log("setupMainPanelSearchKeybindings: Main panel search keybindings set")
 }
 
 // setupSearchKeybindings binds keys for search input
@@ -522,8 +607,8 @@ func (gui *Gui) setupSearchKeybindings() {
 		utils.Log("setupSearchKeybindings: ERROR binding Enter: %v", err)
 	}
 
-	// Escape - cancel search
-	if err := gui.g.SetKeybinding("search", gocui.KeyEsc, gocui.ModNone, gui.onSearchEscape); err != nil {
+	// Escape - cancel search (handled by unified handler)
+	if err := gui.g.SetKeybinding("search", gocui.KeyEsc, gocui.ModNone, gui.onSearchEscapeUnified); err != nil {
 		utils.Log("setupSearchKeybindings: ERROR binding Escape: %v", err)
 	}
 
@@ -544,6 +629,27 @@ func (gui *Gui) onSearchEscape(g *gocui.Gui, v *gocui.View) error {
 	if gui.searchBar != nil {
 		gui.searchBar.Cancel()
 		gui.endSearch()
+	}
+	return nil
+}
+
+// onSearchEscapeUnified handles Escape key for both search modes
+func (gui *Gui) onSearchEscapeUnified(g *gocui.Gui, v *gocui.View) error {
+	utils.Log("onSearchEscapeUnified: Escape pressed, searchTarget=%s", gui.searchTarget)
+
+	if gui.searchTarget == "main" {
+		// Main panel search mode
+		if gui.searchBar != nil {
+			gui.searchBar.Cancel()
+			gui.clearMainPanelSearch()
+			gui.endMainPanelSearch()
+		}
+	} else {
+		// List panel search mode
+		if gui.searchBar != nil {
+			gui.searchBar.Cancel()
+			gui.endSearch()
+		}
 	}
 	return nil
 }
@@ -589,6 +695,213 @@ func (gui *Gui) onSearchDeleteWord(g *gocui.Gui, v *gocui.View) error {
 		gui.searchBar.DeleteWord()
 	}
 	return nil
+}
+
+// Main Panel Search Handlers
+
+// makeMainPanelSearchRuneHandler creates a handler for a specific character in main panel search
+func (gui *Gui) makeMainPanelSearchRuneHandler(ch rune) func(g *gocui.Gui, v *gocui.View) error {
+	return func(g *gocui.Gui, v *gocui.View) error {
+		if gui.searchBar != nil {
+			gui.searchBar.HandleRune(ch)
+		}
+		return nil
+	}
+}
+
+// onMainPanelSearchSpace handles space input in main panel search
+func (gui *Gui) onMainPanelSearchSpace(g *gocui.Gui, v *gocui.View) error {
+	if gui.searchBar != nil {
+		gui.searchBar.HandleRune(' ')
+	}
+	return nil
+}
+
+// onMainPanelSearchBackspace handles backspace in main panel search
+func (gui *Gui) onMainPanelSearchBackspace(g *gocui.Gui, v *gocui.View) error {
+	if gui.searchBar != nil {
+		gui.searchBar.Backspace()
+	}
+	return nil
+}
+
+// onMainPanelSearchClear clears the main panel search text
+func (gui *Gui) onMainPanelSearchClear(g *gocui.Gui, v *gocui.View) error {
+	if gui.searchBar != nil {
+		gui.searchBar.Clear()
+	}
+	return nil
+}
+
+// onMainPanelSearchDeleteWord deletes the last word in main panel search
+func (gui *Gui) onMainPanelSearchDeleteWord(g *gocui.Gui, v *gocui.View) error {
+	if gui.searchBar != nil {
+		gui.searchBar.DeleteWord()
+	}
+	return nil
+}
+
+// onMainPanelSearchEnter confirms the main panel search
+func (gui *Gui) onMainPanelSearchEnter(g *gocui.Gui, v *gocui.View) error {
+	if gui.searchBar != nil {
+		gui.searchBar.Confirm()
+		gui.endMainPanelSearch()
+	}
+	return nil
+}
+
+// onMainPanelSearchEscape cancels the main panel search
+func (gui *Gui) onMainPanelSearchEscape(g *gocui.Gui, v *gocui.View) error {
+	if gui.searchBar != nil {
+		gui.searchBar.Cancel()
+		gui.clearMainPanelSearch()
+		gui.endMainPanelSearch()
+	}
+	return nil
+}
+
+// onMainPanelSearchNext jumps to next match
+func (gui *Gui) onMainPanelSearchNext(g *gocui.Gui, v *gocui.View) error {
+	if gui.mainPanelSearch != nil && gui.mainPanelSearch.IsActive() {
+		lineNum := gui.mainPanelSearch.NextMatch()
+		if lineNum >= 0 {
+			gui.scrollToLine(lineNum)
+			gui.refreshMainPanelWithSearch()
+		}
+		gui.updateStatus()
+	}
+	return nil
+}
+
+// onMainPanelClearSearch clears the main panel search when pressed in main view
+func (gui *Gui) onMainPanelClearSearch(g *gocui.Gui, v *gocui.View) error {
+	if gui.mainPanelSearch != nil && gui.mainPanelSearch.IsActive() {
+		utils.Log("onMainPanelClearSearch: Clearing main panel search from main view")
+		gui.clearMainPanelSearch()
+		gui.updateStatus()
+	}
+	return nil
+}
+
+// onMainPanelSearchPrev jumps to previous match
+func (gui *Gui) onMainPanelSearchPrev(g *gocui.Gui, v *gocui.View) error {
+	if gui.mainPanelSearch != nil && gui.mainPanelSearch.IsActive() {
+		lineNum := gui.mainPanelSearch.PrevMatch()
+		if lineNum >= 0 {
+			gui.scrollToLine(lineNum)
+			gui.refreshMainPanelWithSearch()
+		}
+		gui.updateStatus()
+	}
+	return nil
+}
+
+// endMainPanelSearch exits main panel search mode
+func (gui *Gui) endMainPanelSearch() error {
+	if gui.searchBar != nil {
+		gui.searchBar.Hide()
+	}
+
+	gui.isSearching = false
+	gui.updateStatus()
+
+	// Return focus to the main panel
+	gui.g.SetCurrentView("main")
+
+	return nil
+}
+
+// clearMainPanelSearch clears the search and removes highlights
+func (gui *Gui) clearMainPanelSearch() {
+	if gui.mainPanelSearch != nil {
+		gui.mainPanelSearch.ClearSearch()
+		gui.refreshMainPanelWithSearch()
+	}
+}
+
+// scrollToLine scrolls the main view to show a specific line
+func (gui *Gui) scrollToLine(lineNum int) {
+	if gui.mainView == nil {
+		return
+	}
+
+	// Set origin to show the match line
+	// We try to center the match in the view
+	_, height := gui.mainView.Size()
+	var targetY int
+	if lineNum > height/2 {
+		targetY = lineNum - height/2
+	} else {
+		targetY = 0
+	}
+
+	gui.g.UpdateAsync(func(g *gocui.Gui) error {
+		ox, _ := gui.mainView.Origin()
+		gui.mainView.SetOrigin(ox, targetY)
+		return nil
+	})
+}
+
+// onMainPanelSearchChanged is called when main panel search text changes
+func (gui *Gui) onMainPanelSearchChanged() {
+	if gui.searchBar == nil || gui.mainPanelSearch == nil {
+		return
+	}
+
+	searchText := gui.searchBar.GetText()
+	utils.Log("onMainPanelSearchChanged: Search text changed to: %s", searchText)
+
+	gui.mainPanelSearch.SetSearch(searchText)
+	gui.g.UpdateAsync(func(g *gocui.Gui) error {
+		gui.refreshMainPanelWithSearch()
+		gui.updateStatus()
+		return nil
+	})
+}
+
+// onMainPanelSearchCancel is called when main panel search is cancelled
+func (gui *Gui) onMainPanelSearchCancel() {
+	utils.Log("onMainPanelSearchCancel: Cancelling main panel search")
+	gui.clearMainPanelSearch()
+}
+
+// onMainPanelSearchConfirm is called when main panel search is confirmed
+func (gui *Gui) onMainPanelSearchConfirm() {
+	utils.Log("onMainPanelSearchConfirm: Main panel search confirmed")
+	// Keep the current search highlights
+}
+
+// refreshMainPanelWithSearch refreshes the main panel with search highlights applied
+func (gui *Gui) refreshMainPanelWithSearch() {
+	if gui.mainView == nil {
+		return
+	}
+
+	gui.mainView.Clear()
+
+	// Get the highlighted content
+	var lines []string
+	if gui.mainPanelSearch != nil && gui.mainPanelSearch.IsActive() {
+		lines = gui.mainPanelSearch.GetHighlightedContent()
+	} else {
+		// If search not active, get the content from the last render
+		// We need to re-render the content without highlights
+		gui.renderMainPanelContent()
+		return
+	}
+
+	// Write the highlighted content
+	for _, line := range lines {
+		fmt.Fprintln(gui.mainView, line)
+	}
+}
+
+// renderMainPanelContent re-renders the main panel content without highlights
+// This is used when search is cleared or not active
+func (gui *Gui) renderMainPanelContent() {
+	// Delegate to the existing refreshMainPanel logic
+	// We'll need to modify refreshMainPanel to store its content
+	gui.refreshMainPanel()
 }
 
 // endSearch exits search mode and returns focus to the active panel
@@ -722,6 +1035,10 @@ func (gui *Gui) updateSubscriptionSelectionFromFiltered() {
 		gui.mu.Lock()
 		gui.selectedSub = sub
 		gui.mu.Unlock()
+		// Clear main panel search when switching subscriptions
+		if gui.mainPanelSearch != nil && gui.mainPanelSearch.IsActive() {
+			gui.clearMainPanelSearch()
+		}
 	}
 }
 
@@ -736,6 +1053,10 @@ func (gui *Gui) updateRGSelectionFromFiltered() {
 		gui.mu.Lock()
 		gui.selectedRG = rg
 		gui.mu.Unlock()
+		// Clear main panel search when switching resource groups
+		if gui.mainPanelSearch != nil && gui.mainPanelSearch.IsActive() {
+			gui.clearMainPanelSearch()
+		}
 	}
 }
 
@@ -918,6 +1239,10 @@ func (gui *Gui) updateRGSelection(v *gocui.View) {
 		gui.mu.Lock()
 		gui.selectedRG = rg
 		gui.mu.Unlock()
+		// Clear main panel search when switching resource groups
+		if gui.mainPanelSearch != nil && gui.mainPanelSearch.IsActive() {
+			gui.clearMainPanelSearch()
+		}
 	}
 }
 
@@ -959,6 +1284,10 @@ func (gui *Gui) updateResSelection(v *gocui.View) {
 		gui.mu.Lock()
 		gui.selectedRes = res
 		gui.mu.Unlock()
+		// Clear main panel search when switching resources
+		if gui.mainPanelSearch != nil && gui.mainPanelSearch.IsActive() {
+			gui.clearMainPanelSearch()
+		}
 	}
 }
 
@@ -1402,7 +1731,6 @@ func (gui *Gui) refreshMainPanel() {
 		return
 	}
 
-	gui.mainView.Clear()
 	gui.mu.RLock()
 	tabIndex := gui.tabIndex
 	selectedSub := gui.selectedSub
@@ -1411,124 +1739,217 @@ func (gui *Gui) refreshMainPanel() {
 	activePanel := gui.activePanel
 	gui.mu.RUnlock()
 
+	// Build content lines
+	var lines []string
+	var title string
+
 	// Determine what to display based on what's selected and active panel
 	if selectedRes != nil && (activePanel == "resources" || activePanel == "main") {
 		// Show resource details
 		if tabIndex == 0 {
 			// Summary tab
-			gui.mainView.Title = " Details [Summary] "
-			printKeyValue(gui.mainView, "Name", selectedRes.Name)
-			printKeyValue(gui.mainView, "Type", selectedRes.Type)
-			printKeyValue(gui.mainView, "Location", selectedRes.Location)
-			printKeyValue(gui.mainView, "ID", selectedRes.ID)
-			printKeyValue(gui.mainView, "Resource Group", selectedRes.ResourceGroup)
-			if selectedRes.CreatedTime != "" {
-				printKeyValue(gui.mainView, "Created", selectedRes.CreatedTime)
-			}
-			if selectedRes.ChangedTime != "" {
-				printKeyValue(gui.mainView, "Modified", selectedRes.ChangedTime)
-			}
-			if len(selectedRes.Tags) > 0 {
-				fmt.Fprintln(gui.mainView, "")
-				printKeyValue(gui.mainView, "Tags", "")
-				// Sort tag keys for consistent display
-				tagKeys := make([]string, 0, len(selectedRes.Tags))
-				for k := range selectedRes.Tags {
-					tagKeys = append(tagKeys, k)
-				}
-				sort.Strings(tagKeys)
-				for _, k := range tagKeys {
-					printKeyValue(gui.mainView, "  "+k, selectedRes.Tags[k])
-				}
-			}
-			// Show resource properties if available
-			if len(selectedRes.Properties) > 0 {
-				fmt.Fprintln(gui.mainView, "")
-				printKeyValue(gui.mainView, "Properties", "")
-				// Sort property keys for consistent display
-				propKeys := make([]string, 0, len(selectedRes.Properties))
-				for k := range selectedRes.Properties {
-					propKeys = append(propKeys, k)
-				}
-				sort.Strings(propKeys)
-				for _, k := range propKeys {
-					formatPropertyValue(gui.mainView, k, selectedRes.Properties[k], "  ")
-				}
-			}
-			// Show hint at the bottom when browsing from list view (not in main panel)
-			if activePanel == "resources" {
-				fmt.Fprintln(gui.mainView, "")
-				fmt.Fprintln(gui.mainView, "─────────────────────────────────────────")
-				fmt.Fprintln(gui.mainView, "[Press Enter to load full resource details]")
-			}
+			title = " Details [Summary] "
+			lines = gui.buildResourceSummaryLines(selectedRes, activePanel == "resources")
 		} else {
 			// JSON tab
-			gui.mainView.Title = " Details [JSON] "
-			// Show hint at the top when browsing from list view
-			if activePanel == "resources" {
-				fmt.Fprintln(gui.mainView, "// Press Enter to load full resource details with all properties")
-				fmt.Fprintln(gui.mainView, "")
-			}
-			jsonData, err := json.MarshalIndent(selectedRes, "", "  ")
-			if err != nil {
-				fmt.Fprintf(gui.mainView, "Error marshaling JSON: %v\n", err)
-			} else {
-				fmt.Fprint(gui.mainView, highlightJSON(string(jsonData)))
-			}
+			title = " Details [JSON] "
+			lines = gui.buildResourceJSONLines(selectedRes, activePanel == "resources")
 		}
 	} else if selectedRG != nil && (activePanel == "resourcegroups" || activePanel == "resources") {
 		// Show resource group details
 		if tabIndex == 0 {
 			// Summary tab
-			gui.mainView.Title = " Details [Summary] "
-			printKeyValue(gui.mainView, "Name", selectedRG.Name)
-			printKeyValue(gui.mainView, "Location", selectedRG.Location)
-			printKeyValue(gui.mainView, "Subscription ID", selectedRG.SubscriptionID)
-			printKeyValue(gui.mainView, "ID", selectedRG.ID)
-			printKeyValue(gui.mainView, "Provisioning State", selectedRG.ProvisioningState)
-			if len(selectedRG.Tags) > 0 {
-				fmt.Fprintln(gui.mainView, "")
-				printKeyValue(gui.mainView, "Tags", "")
-				// Sort tag keys for consistent display
-				tagKeys := make([]string, 0, len(selectedRG.Tags))
-				for k := range selectedRG.Tags {
-					tagKeys = append(tagKeys, k)
-				}
-				sort.Strings(tagKeys)
-				for _, k := range tagKeys {
-					printKeyValue(gui.mainView, "  "+k, selectedRG.Tags[k])
-				}
-			}
+			title = " Details [Summary] "
+			lines = gui.buildRGSummaryLines(selectedRG)
 		} else {
 			// JSON tab
-			gui.mainView.Title = " Details [JSON] "
-			jsonData, err := json.MarshalIndent(selectedRG, "", "  ")
-			if err != nil {
-				fmt.Fprintf(gui.mainView, "Error marshaling JSON: %v\n", err)
-			} else {
-				fmt.Fprint(gui.mainView, highlightJSON(string(jsonData)))
-			}
+			title = " Details [JSON] "
+			lines = gui.buildRGJSONLines(selectedRG)
 		}
 	} else if selectedSub != nil {
 		// Show subscription details
 		if tabIndex == 0 {
 			// Summary tab
-			gui.mainView.Title = " Details [Summary] "
-			printKeyValue(gui.mainView, "Name", selectedSub.Name)
-			printKeyValue(gui.mainView, "ID", selectedSub.ID)
-			printKeyValue(gui.mainView, "State", selectedSub.State)
-			printKeyValue(gui.mainView, "Tenant ID", selectedSub.TenantID)
+			title = " Details [Summary] "
+			lines = gui.buildSubSummaryLines(selectedSub)
 		} else {
 			// JSON tab
-			gui.mainView.Title = " Details [JSON] "
-			jsonData, err := json.MarshalIndent(selectedSub, "", "  ")
-			if err != nil {
-				fmt.Fprintf(gui.mainView, "Error marshaling JSON: %v\n", err)
-			} else {
-				fmt.Fprint(gui.mainView, highlightJSON(string(jsonData)))
-			}
+			title = " Details [JSON] "
+			lines = gui.buildSubJSONLines(selectedSub)
 		}
 	}
+
+	// Update the view
+	gui.mainView.Title = title
+	gui.mainView.Clear()
+
+	// Store content for search highlighting
+	if gui.mainPanelSearch != nil {
+		gui.mainPanelSearch.SetContent(lines)
+	}
+
+	// If search is active, show highlighted content
+	if gui.mainPanelSearch != nil && gui.mainPanelSearch.IsActive() {
+		highlightedLines := gui.mainPanelSearch.GetHighlightedContent()
+		for _, line := range highlightedLines {
+			fmt.Fprintln(gui.mainView, line)
+		}
+	} else {
+		// Show normal content
+		for _, line := range lines {
+			fmt.Fprintln(gui.mainView, line)
+		}
+	}
+}
+
+// buildResourceSummaryLines builds the summary view lines for a resource
+func (gui *Gui) buildResourceSummaryLines(res *domain.Resource, showHint bool) []string {
+	var lines []string
+	lines = append(lines, fmt.Sprintf("%sName:%s %s", colorBoldKey, colorReset, res.Name))
+	lines = append(lines, fmt.Sprintf("%sType:%s %s", colorBoldKey, colorReset, res.Type))
+	lines = append(lines, fmt.Sprintf("%sLocation:%s %s", colorBoldKey, colorReset, res.Location))
+	lines = append(lines, fmt.Sprintf("%sID:%s %s", colorBoldKey, colorReset, res.ID))
+	lines = append(lines, fmt.Sprintf("%sResource Group:%s %s", colorBoldKey, colorReset, res.ResourceGroup))
+	if res.CreatedTime != "" {
+		lines = append(lines, fmt.Sprintf("%sCreated:%s %s", colorBoldKey, colorReset, res.CreatedTime))
+	}
+	if res.ChangedTime != "" {
+		lines = append(lines, fmt.Sprintf("%sModified:%s %s", colorBoldKey, colorReset, res.ChangedTime))
+	}
+	if len(res.Tags) > 0 {
+		lines = append(lines, "")
+		lines = append(lines, fmt.Sprintf("%sTags:%s", colorBoldKey, colorReset))
+		tagKeys := make([]string, 0, len(res.Tags))
+		for k := range res.Tags {
+			tagKeys = append(tagKeys, k)
+		}
+		sort.Strings(tagKeys)
+		for _, k := range tagKeys {
+			lines = append(lines, fmt.Sprintf("%s  %s:%s %s", colorBoldKey, k, colorReset, res.Tags[k]))
+		}
+	}
+	if len(res.Properties) > 0 {
+		lines = append(lines, "")
+		lines = append(lines, fmt.Sprintf("%sProperties:%s", colorBoldKey, colorReset))
+		propKeys := make([]string, 0, len(res.Properties))
+		for k := range res.Properties {
+			propKeys = append(propKeys, k)
+		}
+		sort.Strings(propKeys)
+		for _, k := range propKeys {
+			lines = append(lines, gui.formatPropertyLines(k, res.Properties[k], "  ")...)
+		}
+	}
+	if showHint {
+		lines = append(lines, "")
+		lines = append(lines, "─────────────────────────────────────────")
+		lines = append(lines, "[Press Enter to load full resource details]")
+	}
+	return lines
+}
+
+// buildResourceJSONLines builds the JSON view lines for a resource
+func (gui *Gui) buildResourceJSONLines(res *domain.Resource, showHint bool) []string {
+	var lines []string
+	if showHint {
+		lines = append(lines, "// Press Enter to load full resource details with all properties")
+		lines = append(lines, "")
+	}
+	jsonData, err := json.MarshalIndent(res, "", "  ")
+	if err != nil {
+		lines = append(lines, fmt.Sprintf("Error marshaling JSON: %v", err))
+	} else {
+		// Split the highlighted JSON into lines
+		highlighted := highlightJSON(string(jsonData))
+		lines = append(lines, strings.Split(highlighted, "\n")...)
+	}
+	return lines
+}
+
+// buildRGSummaryLines builds the summary view lines for a resource group
+func (gui *Gui) buildRGSummaryLines(rg *domain.ResourceGroup) []string {
+	var lines []string
+	lines = append(lines, fmt.Sprintf("%sName:%s %s", colorBoldKey, colorReset, rg.Name))
+	lines = append(lines, fmt.Sprintf("%sLocation:%s %s", colorBoldKey, colorReset, rg.Location))
+	lines = append(lines, fmt.Sprintf("%sSubscription ID:%s %s", colorBoldKey, colorReset, rg.SubscriptionID))
+	lines = append(lines, fmt.Sprintf("%sID:%s %s", colorBoldKey, colorReset, rg.ID))
+	lines = append(lines, fmt.Sprintf("%sProvisioning State:%s %s", colorBoldKey, colorReset, rg.ProvisioningState))
+	if len(rg.Tags) > 0 {
+		lines = append(lines, "")
+		lines = append(lines, fmt.Sprintf("%sTags:%s", colorBoldKey, colorReset))
+		tagKeys := make([]string, 0, len(rg.Tags))
+		for k := range rg.Tags {
+			tagKeys = append(tagKeys, k)
+		}
+		sort.Strings(tagKeys)
+		for _, k := range tagKeys {
+			lines = append(lines, fmt.Sprintf("%s  %s:%s %s", colorBoldKey, k, colorReset, rg.Tags[k]))
+		}
+	}
+	return lines
+}
+
+// buildRGJSONLines builds the JSON view lines for a resource group
+func (gui *Gui) buildRGJSONLines(rg *domain.ResourceGroup) []string {
+	var lines []string
+	jsonData, err := json.MarshalIndent(rg, "", "  ")
+	if err != nil {
+		lines = append(lines, fmt.Sprintf("Error marshaling JSON: %v", err))
+	} else {
+		highlighted := highlightJSON(string(jsonData))
+		lines = append(lines, strings.Split(highlighted, "\n")...)
+	}
+	return lines
+}
+
+// buildSubSummaryLines builds the summary view lines for a subscription
+func (gui *Gui) buildSubSummaryLines(sub *domain.Subscription) []string {
+	var lines []string
+	lines = append(lines, fmt.Sprintf("%sName:%s %s", colorBoldKey, colorReset, sub.Name))
+	lines = append(lines, fmt.Sprintf("%sID:%s %s", colorBoldKey, colorReset, sub.ID))
+	lines = append(lines, fmt.Sprintf("%sState:%s %s", colorBoldKey, colorReset, sub.State))
+	lines = append(lines, fmt.Sprintf("%sTenant ID:%s %s", colorBoldKey, colorReset, sub.TenantID))
+	return lines
+}
+
+// buildSubJSONLines builds the JSON view lines for a subscription
+func (gui *Gui) buildSubJSONLines(sub *domain.Subscription) []string {
+	var lines []string
+	jsonData, err := json.MarshalIndent(sub, "", "  ")
+	if err != nil {
+		lines = append(lines, fmt.Sprintf("Error marshaling JSON: %v", err))
+	} else {
+		highlighted := highlightJSON(string(jsonData))
+		lines = append(lines, strings.Split(highlighted, "\n")...)
+	}
+	return lines
+}
+
+// formatPropertyLines formats a property value and returns lines (for nested structures)
+func (gui *Gui) formatPropertyLines(key string, value interface{}, indent string) []string {
+	var lines []string
+	switch v := value.(type) {
+	case map[string]interface{}:
+		lines = append(lines, fmt.Sprintf("%s%s%s:%s", colorBoldKey, indent+key, colorReset, ""))
+		nestedKeys := make([]string, 0, len(v))
+		for k := range v {
+			nestedKeys = append(nestedKeys, k)
+		}
+		sort.Strings(nestedKeys)
+		for _, nestedKey := range nestedKeys {
+			lines = append(lines, gui.formatPropertyLines(nestedKey, v[nestedKey], indent+"  ")...)
+		}
+	case []interface{}:
+		lines = append(lines, fmt.Sprintf("%s%s%s:%s", colorBoldKey, indent+key, colorReset, ""))
+		for i, item := range v {
+			lines = append(lines, gui.formatPropertyLines(fmt.Sprintf("[%d]", i), item, indent+"  ")...)
+		}
+	case nil:
+		lines = append(lines, fmt.Sprintf("%s%s%s:%s null", colorBoldKey, indent+key, colorReset, ""))
+	default:
+		lines = append(lines, fmt.Sprintf("%s%s%s:%s %v", colorBoldKey, indent+key, colorReset, "", v))
+	}
+	return lines
 }
 
 func (gui *Gui) updateStatus() {
@@ -1570,7 +1991,25 @@ func (gui *Gui) updateStatus() {
 			status = fmt.Sprintf("↑↓: Navigate | /: Search | Enter: View Details | c: Copy | Tab: Switch | []: Tabs | r: Refresh | q: Quit | Resources: %d", resTotal)
 		}
 	case "main":
-		status = fmt.Sprintf("↑/↓ or j/k: Scroll | PgUp/PgDn: Page | c: Copy Link | Tab: Back to List | []: Tabs | r: Refresh | q: Quit")
+		if gui.mainPanelSearch != nil && gui.mainPanelSearch.IsActive() {
+			if gui.isSearching {
+				// Currently in search input mode
+				status = fmt.Sprintf("/%s_ | n: Next | N: Prev | Esc: Cancel",
+					gui.mainPanelSearch.GetSearchText())
+				if gui.mainPanelSearch.GetMatchCount() > 0 {
+					current, total := gui.mainPanelSearch.GetCurrentMatch()
+					status = fmt.Sprintf("/%s_ | Match %d/%d | n: Next | N: Prev | Esc: Cancel",
+						gui.mainPanelSearch.GetSearchText(), current, total)
+				}
+			} else {
+				// Search active but not in input mode
+				current, total := gui.mainPanelSearch.GetCurrentMatch()
+				status = fmt.Sprintf("Match %d/%d for \"%s\" | n: Next | N: Prev | /: New Search | Esc: Clear",
+					current, total, gui.mainPanelSearch.GetSearchText())
+			}
+		} else {
+			status = fmt.Sprintf("↑/↓ or j/k: Scroll | PgUp/PgDn: Page | /: Search | c: Copy Link | Tab: Back to List | []: Tabs | r: Refresh | q: Quit")
+		}
 	default:
 		status = fmt.Sprintf("↑↓: Navigate | Tab: Switch | r: Refresh | q: Quit")
 	}

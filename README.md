@@ -129,6 +129,17 @@ See other methods under [authentication](#Authentication).
 - **PgUp / PgDn**: Scroll content by page
 - **r**: Refresh current data
 
+**Main Panel Search (when viewing resource details):**
+- **/**: Search within the details panel (highlights matching lines)
+- **Characters** (in search): Type to find matches
+- **Backspace**: Delete last character
+- **Ctrl+U**: Clear entire search
+- **Ctrl+W**: Delete last word
+- **n**: Jump to next match
+- **N**: Jump to previous match
+- **Enter**: Confirm search and exit input mode
+- **Escape**: Clear search and remove highlights
+
 **Application:**
 - **q** or **Ctrl+C**: Quit
 - **c**: Copy portal link to clipboard
