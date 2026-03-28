@@ -295,12 +295,16 @@ func (gui *Gui) setupViews() error {
 func (gui *Gui) setupKeybindings() error {
 	utils.Log("setupKeybindings: Setting up keybindings...")
 
-	// Global quit
+	// Global quit - Ctrl+C works everywhere including search
 	quitKeys := []string{"", "subscriptions", "resourcegroups", "resources", "main", "search"}
 	for _, view := range quitKeys {
 		if err := gui.g.SetKeybinding(view, gocui.KeyCtrlC, gocui.ModNone, gui.quit); err != nil {
 			return err
 		}
+	}
+	// 'q' to quit - not bound to search view since 'q' is used for search input
+	quitKeysNoSearch := []string{"", "subscriptions", "resourcegroups", "resources", "main"}
+	for _, view := range quitKeysNoSearch {
 		if err := gui.g.SetKeybinding(view, 'q', gocui.ModNone, gui.quit); err != nil {
 			return err
 		}
