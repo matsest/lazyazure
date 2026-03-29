@@ -251,6 +251,27 @@ mu.Unlock()
 onSearch(text)  // Safe - no lock held
 ```
 
+#### Issue: Timer callback causes deadlock in version display
+**Cause**: Timer callback holding lock while calling updateStatus() which also needs lock  
+**Fix**: Release lock before calling updateStatus():
+```go
+// ❌ WRONG: Holding lock while calling function that needs lock
+func (gui *Gui) clearVersionDisplay() {
+    gui.mu.Lock()
+    defer gui.mu.Unlock()
+    gui.showingVersion = false
+    gui.updateStatus()  // DEADLOCK - tries to acquire same lock!
+}
+
+// ✅ CORRECT: Release lock before calling updateStatus()
+func (gui *Gui) clearVersionDisplay() {
+    gui.mu.Lock()
+    gui.showingVersion = false
+    gui.mu.Unlock()
+    gui.updateStatus()  // Safe - lock released
+}
+```
+
 ### 8. Build and Run
 
 ```bash
@@ -269,6 +290,14 @@ LAZYAZURE_DEBUG=1 ./lazyazure
 
 # Run in demo mode (mock data, no Azure credentials needed)
 LAZYAZURE_DEMO=1 ./lazyazure
+
+# Check version
+./lazyazure --version
+# or
+./lazyazure -v
+
+# Check for updates
+./lazyazure --check-update
 
 # Test
 go test ./pkg/...
@@ -500,6 +529,28 @@ Azure resource types (e.g., "Microsoft.Compute/virtualMachines") are mapped to h
 1. Add entry to `display_names.json` following existing format
 2. Add test case in `display_names_test.go`
 3. Test both exact and case-insensitive lookups
+
+### Version Display and Update Checking
+
+#### TUI Version Display (`?` keybinding)
+- Press `?` in any view to show version information in the status bar
+- Displays: current version, commit hash, and update status
+- Fetches latest version from GitHub releases API (cached for session)
+- Auto-dismisses after 5 seconds or press Escape to clear
+- Development builds (dev, dirty, ahead-of-tag) show "Development build" message
+
+#### CLI Update Checking (`--check-update` flag)
+- `./lazyazure --check-update` checks for updates non-interactively
+- Exit codes: 0=up to date/dev, 1=update available, 2=error
+- Development builds skip version comparison but still show latest version
+
+#### Implementation Notes
+- GitHub API: `https://api.github.com/repos/matsest/lazyazure/releases/latest`
+- 10-second timeout on HTTP requests
+- Development build detection uses git describe patterns:
+  - `dev` = plain go build
+  - `-dirty` = uncommitted changes
+  - `-g[hex]` = commits ahead of tag (e.g., `v0.2.1-2-gc15ffdf`)
 
 ## Session Checklist
 

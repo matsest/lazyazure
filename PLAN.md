@@ -134,6 +134,7 @@ A TUI application for Azure resource management, inspired by lazydocker. It prov
    - ✅ Arrow keys for navigation
    - ✅ `Tab` for switching right panel tabs
    - ✅ `Enter` to drill down, `Escape` to clear filter
+   - ✅ `?` for version information and update checking
 
 **Visual Polish**
 - ✅ Color-coded keys in Summary view (green)
