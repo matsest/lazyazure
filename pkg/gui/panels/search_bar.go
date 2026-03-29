@@ -139,7 +139,7 @@ func (sb *SearchBar) HandleRune(ch rune) {
 
 	// Call callback outside of lock to avoid deadlock
 	sb.onSearch(searchText)
-	utils.Log("SearchBar: Added char '%c', text now: '%s'", ch, searchText)
+	utils.Log("SearchBar: Char added, length=%d", len(searchText))
 }
 
 // Backspace removes the last character
@@ -156,7 +156,7 @@ func (sb *SearchBar) Backspace() {
 
 	// Call callback outside of lock to avoid deadlock
 	sb.onSearch(searchText)
-	utils.Log("SearchBar: Backspace, text now: '%s'", searchText)
+	utils.Log("SearchBar: Backspace, length=%d", len(searchText))
 }
 
 // Clear removes all text
@@ -192,7 +192,7 @@ func (sb *SearchBar) DeleteWord() {
 
 	// Call callback outside of lock to avoid deadlock
 	sb.onSearch(searchText)
-	utils.Log("SearchBar: Delete word, text now: '%s'", searchText)
+	utils.Log("SearchBar: Word deleted, length=%d", len(searchText))
 }
 
 // Cancel cancels the search and restores previous state

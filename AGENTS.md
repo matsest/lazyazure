@@ -85,6 +85,30 @@ import "github.com/matsest/lazyazure/pkg/utils"
 utils.Log("message: %s", value)
 ```
 
+**Debug Logging Privacy:**
+
+When `LAZYAZURE_DEBUG=1` is enabled, logs are written to `~/.lazyazure/debug.log`. 
+The logs are designed to be safe to share for debugging while protecting sensitive information:
+
+**What IS logged:**
+- Application flow and lifecycle events (initialization, view setup, etc.)
+- UI interactions (panel switches, keybindings, clicks)
+- Performance metrics (operation timing, result counts)
+- Error messages and types
+- Authentication success/failure (without identity details)
+- Search activity (character counts, not content)
+
+**What is NOT logged:**
+- User Principal Names (UPN/email addresses)
+- Display names
+- Tenant IDs or Object IDs
+- Resource IDs
+- Search query content
+- Full JWT tokens or credentials
+
+The goal is to provide enough context to diagnose issues without exposing 
+personally identifiable information or organizational data.
+
 ### 4. Layout and Panels
 
 #### Stacked Panel Layout

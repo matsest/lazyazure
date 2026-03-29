@@ -919,7 +919,7 @@ func (gui *Gui) onMainPanelSearchChanged() {
 	}
 
 	searchText := gui.searchBar.GetText()
-	utils.Log("onMainPanelSearchChanged: Search text changed to: %s", searchText)
+	utils.Log("onMainPanelSearchChanged: Search active, length=%d", len(searchText))
 
 	gui.mainPanelSearch.SetSearch(searchText)
 	gui.g.UpdateAsync(func(g *gocui.Gui) error {
@@ -1000,11 +1000,12 @@ func (gui *Gui) onSearchChanged() {
 	}
 
 	searchText := gui.searchBar.GetText()
-	utils.Log("onSearchChanged: Search text changed to: %s", searchText)
 
 	gui.mu.RLock()
 	activePanel := gui.activePanel
 	gui.mu.RUnlock()
+
+	utils.Log("onSearchChanged: Search active, length=%d, panel=%s", len(searchText), activePanel)
 
 	utils.Log("onSearchChanged: Active panel is %s, calling UpdateAsync...", activePanel)
 
@@ -2375,7 +2376,7 @@ func (gui *Gui) loadResourceDetails(originalRes *domain.Resource) {
 		// Fetch full resource details with provider-specific properties
 		resource, err := resClient.GetResource(ctx, originalRes.ID, originalRes.Type)
 		if err != nil {
-			utils.Log("loadResourceDetails: Error getting resource %s: %v", originalRes.ID, err)
+			utils.Log("loadResourceDetails: Error loading resource, type=%s, error=%v", originalRes.Type, err)
 			return
 		}
 

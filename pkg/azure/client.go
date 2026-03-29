@@ -81,10 +81,10 @@ func (c *Client) GetUserInfo(ctx context.Context) (*domain.User, error) {
 		return nil, fmt.Errorf("failed to parse access token: %w", err)
 	}
 
-	// Debug logging to see what claims are present
-	utils.Log("GetUserInfo: Token claims - tid=%s, oid=%s, upn=%s, preferred_username=%s, appid=%s, azp=%s, name=%s",
-		claims.TenantID, claims.ObjectID, claims.UserPrincipalName, claims.PreferredUsername,
-		claims.AppID, claims.Azp, claims.Name)
+	// Debug logging to see what claims are present (boolean flags only for privacy)
+	utils.Log("GetUserInfo: Token claims present - has_tid=%v, has_oid=%v, has_upn=%v, has_preferred_username=%v, has_appid=%v, has_azp=%v, has_name=%v",
+		claims.TenantID != "", claims.ObjectID != "", claims.UserPrincipalName != "",
+		claims.PreferredUsername != "", claims.AppID != "", claims.Azp != "", claims.Name != "")
 
 	user := &domain.User{
 		TenantID: claims.TenantID,
@@ -107,7 +107,7 @@ func (c *Client) GetUserInfo(ctx context.Context) (*domain.User, error) {
 		}
 		user.UserPrincipalName = appId
 		user.DisplayName = appId
-		utils.Log("GetUserInfo: Detected as Service Principal, appId=%s", appId)
+		utils.Log("GetUserInfo: Service Principal authenticated, identity_type=serviceprincipal")
 	} else {
 		// Regular user (delegated token)
 		user.Type = "user"
@@ -128,7 +128,8 @@ func (c *Client) GetUserInfo(ctx context.Context) (*domain.User, error) {
 		} else {
 			user.DisplayName = user.UserPrincipalName
 		}
-		utils.Log("GetUserInfo: Detected as User, UPN=%s, DisplayName=%s", user.UserPrincipalName, user.DisplayName)
+		utils.Log("GetUserInfo: User authenticated, identity_type=user, has_upn=%v, has_display_name=%v",
+			user.UserPrincipalName != "", user.DisplayName != user.UserPrincipalName && user.DisplayName != "")
 	}
 
 	return user, nil
