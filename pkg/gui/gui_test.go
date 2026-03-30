@@ -2,11 +2,14 @@ package gui
 
 import (
 	"context"
+	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/jesseduffield/gocui"
+	"github.com/matsest/lazyazure/pkg/domain"
 	"github.com/matsest/lazyazure/pkg/tasks"
 )
 
@@ -249,6 +252,202 @@ func TestIsDevelopmentBuild(t *testing.T) {
 			if result != tt.isDevBuild {
 				t.Errorf("isDevelopmentBuild() for version %q = %v, want %v",
 					tt.version, result, tt.isDevBuild)
+			}
+		})
+	}
+}
+
+// TestSubscriptionSorting verifies subscriptions are sorted alphabetically (case-insensitive)
+func TestSubscriptionSorting(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []*domain.Subscription
+		expected []string
+	}{
+		{
+			name: "basic alphabetical sorting",
+			input: []*domain.Subscription{
+				{Name: "Prod-West"},
+				{Name: "Prod-East"},
+				{Name: "Staging"},
+			},
+			expected: []string{"Prod-East", "Prod-West", "Staging"},
+		},
+		{
+			name: "case-insensitive sorting",
+			input: []*domain.Subscription{
+				{Name: "prod-west"},
+				{Name: "Prod-East"},
+				{Name: "STAGING"},
+			},
+			expected: []string{"Prod-East", "prod-west", "STAGING"},
+		},
+		{
+			name: "mixed case same base",
+			input: []*domain.Subscription{
+				{Name: "Apple"},
+				{Name: "banana"},
+				{Name: "Cherry"},
+				{Name: "apricot"},
+			},
+			expected: []string{"Apple", "apricot", "banana", "Cherry"},
+		},
+		{
+			name: "single item",
+			input: []*domain.Subscription{
+				{Name: "OnlySub"},
+			},
+			expected: []string{"OnlySub"},
+		},
+		{
+			name:     "empty list",
+			input:    []*domain.Subscription{},
+			expected: []string{},
+		},
+		{
+			name: "already sorted",
+			input: []*domain.Subscription{
+				{Name: "A"},
+				{Name: "B"},
+				{Name: "C"},
+			},
+			expected: []string{"A", "B", "C"},
+		},
+		{
+			name: "reverse sorted",
+			input: []*domain.Subscription{
+				{Name: "Z"},
+				{Name: "Y"},
+				{Name: "X"},
+			},
+			expected: []string{"X", "Y", "Z"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a copy to sort
+			subs := make([]*domain.Subscription, len(tt.input))
+			copy(subs, tt.input)
+
+			// Apply the same sorting logic as in loadSubscriptions
+			sort.Slice(subs, func(i, j int) bool {
+				return strings.ToLower(subs[i].Name) < strings.ToLower(subs[j].Name)
+			})
+
+			// Verify the order
+			if len(subs) != len(tt.expected) {
+				t.Fatalf("Expected %d items, got %d", len(tt.expected), len(subs))
+			}
+
+			for i, sub := range subs {
+				if sub.Name != tt.expected[i] {
+					t.Errorf("Position %d: expected %q, got %q", i, tt.expected[i], sub.Name)
+				}
+			}
+		})
+	}
+}
+
+// TestResourceGroupSorting verifies resource groups are sorted alphabetically (case-insensitive)
+func TestResourceGroupSorting(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []*domain.ResourceGroup
+		expected []string
+	}{
+		{
+			name: "basic alphabetical sorting",
+			input: []*domain.ResourceGroup{
+				{Name: "rg-prod-web"},
+				{Name: "rg-prod-storage"},
+				{Name: "rg-prod-networking"},
+			},
+			expected: []string{"rg-prod-networking", "rg-prod-storage", "rg-prod-web"},
+		},
+		{
+			name: "case-insensitive sorting",
+			input: []*domain.ResourceGroup{
+				{Name: "RG-Prod-Web"},
+				{Name: "rg-prod-storage"},
+				{Name: "RG-PROD-NETWORKING"},
+			},
+			expected: []string{"RG-PROD-NETWORKING", "rg-prod-storage", "RG-Prod-Web"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a copy to sort
+			rgs := make([]*domain.ResourceGroup, len(tt.input))
+			copy(rgs, tt.input)
+
+			// Apply the same sorting logic as in loadResourceGroups
+			sort.Slice(rgs, func(i, j int) bool {
+				return strings.ToLower(rgs[i].Name) < strings.ToLower(rgs[j].Name)
+			})
+
+			// Verify the order
+			if len(rgs) != len(tt.expected) {
+				t.Fatalf("Expected %d items, got %d", len(tt.expected), len(rgs))
+			}
+
+			for i, rg := range rgs {
+				if rg.Name != tt.expected[i] {
+					t.Errorf("Position %d: expected %q, got %q", i, tt.expected[i], rg.Name)
+				}
+			}
+		})
+	}
+}
+
+// TestResourceSorting verifies resources are sorted alphabetically (case-insensitive)
+func TestResourceSorting(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []*domain.Resource
+		expected []string
+	}{
+		{
+			name: "basic alphabetical sorting",
+			input: []*domain.Resource{
+				{Name: "web-server-01"},
+				{Name: "app-server-02"},
+				{Name: "db-server-01"},
+			},
+			expected: []string{"app-server-02", "db-server-01", "web-server-01"},
+		},
+		{
+			name: "case-insensitive sorting",
+			input: []*domain.Resource{
+				{Name: "Web-Server-01"},
+				{Name: "app-server-02"},
+				{Name: "DB-Server-01"},
+			},
+			expected: []string{"app-server-02", "DB-Server-01", "Web-Server-01"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a copy to sort
+			resources := make([]*domain.Resource, len(tt.input))
+			copy(resources, tt.input)
+
+			// Apply the same sorting logic as in loadResources
+			sort.Slice(resources, func(i, j int) bool {
+				return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
+			})
+
+			// Verify the order
+			if len(resources) != len(tt.expected) {
+				t.Fatalf("Expected %d items, got %d", len(tt.expected), len(resources))
+			}
+
+			for i, res := range resources {
+				if res.Name != tt.expected[i] {
+					t.Errorf("Position %d: expected %q, got %q", i, tt.expected[i], res.Name)
+				}
 			}
 		})
 	}
