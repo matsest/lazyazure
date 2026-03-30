@@ -102,9 +102,15 @@ The logs are designed to be safe to share for debugging while protecting sensiti
 - User Principal Names (UPN/email addresses)
 - Display names
 - Tenant IDs or Object IDs
-- Resource IDs
+- Resource IDs (full Azure resource IDs, subscription IDs, resource group IDs)
 - Search query content
 - Full JWT tokens or credentials
+
+**Safe alternatives for debugging:**
+- Use presence indicators: `hasSub := savedSubID != ""` then log `hasSub=true/false`
+- Log indices/positions instead of IDs: `found at index 5` instead of `found ID xyz`
+- Log counts and lengths: `loaded 20 subscriptions` instead of listing them
+- Use anonymized identifiers: `resource-1`, `rg-A` if item identification is needed
 
 The goal is to provide enough context to diagnose issues without exposing 
 personally identifiable information or organizational data.
@@ -136,6 +142,15 @@ The UI uses a 4-panel stacked layout on the left side:
 - Click a list item to select it and trigger the Enter action (loads next panel)
 - Click Summary/JSON tabs in the main panel to switch views
 - Each panel has independent navigation keybindings
+
+#### Cursor Position Preservation
+When pressing `r` to refresh data, cursor positions are preserved:
+- Before refresh: Save the IDs of currently selected items (`selectedSub.ID`, `selectedRG.ID`, `selectedRes.ID`)
+- After data loads: Use `FindIndex()` to locate items with matching IDs in filtered lists
+- Restore cursor position using `SetCursor(0, targetIndex)`
+- Update selection pointers to reference items from new data
+
+Implementation: See `loadSubscriptionsWithSelection()`, `loadResourceGroupsWithSelection()`, and `loadResourcesWithSelection()` functions
 
 #### Mouse Support
 - Mouse support is enabled via `gui.g.Mouse = true`

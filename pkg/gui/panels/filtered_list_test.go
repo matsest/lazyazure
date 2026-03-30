@@ -1,6 +1,7 @@
 package panels
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -330,6 +331,41 @@ func TestEmptyFilterShowsAll(t *testing.T) {
 	}
 
 	if fl.IsFiltering() {
-		t.Error("Should not be filtering with empty filter text")
+		t.Error("Should not be filtering with empty text")
+	}
+}
+
+func TestFindIndex(t *testing.T) {
+	fl := NewFilteredList[string]()
+	items := []string{"apple", "banana", "cherry", "application", "pineapple"}
+	fl.SetItems(items, func(s string) string { return s })
+
+	// Find existing item
+	if idx, ok := fl.FindIndex(func(s string) bool { return s == "banana" }); !ok || idx != 1 {
+		t.Errorf("Expected index 1 for 'banana', got %d, ok=%v", idx, ok)
+	}
+
+	// Find first matching item
+	if idx, ok := fl.FindIndex(func(s string) bool { return strings.HasPrefix(s, "app") }); !ok || idx != 0 {
+		t.Errorf("Expected index 0 for first 'app*' item, got %d, ok=%v", idx, ok)
+	}
+
+	// Find non-existing item
+	if _, ok := fl.FindIndex(func(s string) bool { return s == "orange" }); ok {
+		t.Error("Expected false for non-existing item")
+	}
+
+	// Test with filter active
+	fl.SetFilter("app")
+	// Filtered items: apple (0), application (1), pineapple (2)
+
+	// Find item in filtered list
+	if idx, ok := fl.FindIndex(func(s string) bool { return s == "application" }); !ok || idx != 1 {
+		t.Errorf("Expected index 1 for 'application' in filtered list, got %d, ok=%v", idx, ok)
+	}
+
+	// Find item not in filtered list
+	if _, ok := fl.FindIndex(func(s string) bool { return s == "banana" }); ok {
+		t.Error("Expected false for item not in filtered list")
 	}
 }

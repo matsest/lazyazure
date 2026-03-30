@@ -2000,22 +2000,226 @@ func (gui *Gui) updatePanelTitles() {
 }
 
 func (gui *Gui) refresh(g *gocui.Gui, v *gocui.View) error {
-	// Reload all data
-	gui.loadUserInfo()
-	gui.loadSubscriptions()
-
+	// Save current selection IDs to restore cursor positions after refresh
 	gui.mu.RLock()
-	selectedSub := gui.selectedSub
-	selectedRG := gui.selectedRG
+	savedSubID := ""
+	savedRGID := ""
+	savedResID := ""
+	if gui.selectedSub != nil {
+		savedSubID = gui.selectedSub.ID
+	}
+	if gui.selectedRG != nil {
+		savedRGID = gui.selectedRG.ID
+	}
+	if gui.selectedRes != nil {
+		savedResID = gui.selectedRes.ID
+	}
 	gui.mu.RUnlock()
 
-	if selectedSub != nil {
-		gui.loadResourceGroups(selectedSub.ID)
-	}
+	// Reload all data in a single goroutine to avoid race conditions
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
 
-	if selectedRG != nil && selectedSub != nil {
-		gui.loadResources(selectedSub.ID, selectedRG.Name)
-	}
+		// Log refresh start with ID presence indicators (not actual IDs for privacy)
+		hasSub := savedSubID != ""
+		hasRG := savedRGID != ""
+		hasRes := savedResID != ""
+		utils.Log("refresh: Starting refresh (hasSub=%v, hasRG=%v, hasRes=%v)", hasSub, hasRG, hasRes)
+
+		// Clear any active filters so we can find the saved items
+		gui.subList.ClearFilter()
+		gui.rgList.ClearFilter()
+		gui.resList.ClearFilter()
+
+		// Load subscriptions
+		gui.mu.RLock()
+		subClient := gui.subClient
+		gui.mu.RUnlock()
+
+		var subs []*domain.Subscription
+		var subTargetIndex int = -1
+		if subClient != nil {
+			var err error
+			subs, err = subClient.ListSubscriptions(ctx)
+			if err != nil {
+				utils.Log("refresh: Error loading subscriptions: %v", err)
+			} else {
+				// Sort subscriptions alphabetically
+				sort.Slice(subs, func(i, j int) bool {
+					return strings.ToLower(subs[i].Name) < strings.ToLower(subs[j].Name)
+				})
+
+				gui.mu.Lock()
+				gui.subscriptions = subs
+				gui.mu.Unlock()
+
+				gui.subList.SetItems(subs, func(sub *domain.Subscription) string {
+					return formatWithGraySuffix(sub.DisplayString(), sub.GetDisplaySuffix())
+				})
+
+				// Find saved subscription index
+				if savedSubID != "" {
+					if idx, ok := gui.subList.FindIndex(func(sub *domain.Subscription) bool {
+						return sub.ID == savedSubID
+					}); ok {
+						subTargetIndex = idx
+						utils.Log("refresh: Found subscription at index %d", idx)
+					} else {
+						utils.Log("refresh: Saved subscription not found in new data")
+					}
+				}
+			}
+		}
+
+		// Load resource groups
+		var rgs []*domain.ResourceGroup
+		var rgTargetIndex int = -1
+		var rgClient ResourceGroupsClient
+		if savedSubID != "" {
+			var err error
+			rgClient, err = gui.clientFactory.NewResourceGroupsClient(savedSubID)
+			if err != nil {
+				utils.Log("refresh: Error creating RG client: %v", err)
+			} else {
+				rgs, err = rgClient.ListResourceGroups(ctx)
+				if err != nil {
+					utils.Log("refresh: Error loading resource groups: %v", err)
+				} else {
+					// Sort RGs alphabetically
+					sort.Slice(rgs, func(i, j int) bool {
+						return strings.ToLower(rgs[i].Name) < strings.ToLower(rgs[j].Name)
+					})
+
+					gui.mu.Lock()
+					gui.resourceGroups = rgs
+					gui.rgClient = rgClient
+					gui.mu.Unlock()
+
+					gui.rgList.SetItems(rgs, func(rg *domain.ResourceGroup) string {
+						return formatWithGraySuffix(rg.DisplayString(), rg.GetDisplaySuffix())
+					})
+
+					// Find saved RG index
+					if savedRGID != "" {
+						if idx, ok := gui.rgList.FindIndex(func(rg *domain.ResourceGroup) bool {
+							return rg.ID == savedRGID
+						}); ok {
+							rgTargetIndex = idx
+							utils.Log("refresh: Found RG at index %d", idx)
+						} else {
+							utils.Log("refresh: Saved resource group not found in new data")
+						}
+					}
+				}
+			}
+		}
+
+		// Load resources
+		var resources []*domain.Resource
+		var resTargetIndex int = -1
+		var resClient ResourcesClient
+		if savedSubID != "" && savedRGID != "" && len(rgs) > 0 {
+			// Find the RG name from the saved RG ID
+			var rgName string
+			for _, rg := range rgs {
+				if rg.ID == savedRGID {
+					rgName = rg.Name
+					break
+				}
+			}
+
+			if rgName != "" {
+				var err error
+				resClient, err = gui.clientFactory.NewResourcesClient(savedSubID)
+				if err != nil {
+					utils.Log("refresh: Error creating resources client: %v", err)
+				} else {
+					resources, err = resClient.ListResourcesByResourceGroup(ctx, rgName)
+					if err != nil {
+						utils.Log("refresh: Error loading resources: %v", err)
+					} else {
+						// Sort resources alphabetically
+						sort.Slice(resources, func(i, j int) bool {
+							return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
+						})
+
+						gui.mu.Lock()
+						gui.resources = resources
+						gui.resClient = resClient
+						gui.mu.Unlock()
+
+						gui.resList.SetItems(resources, func(res *domain.Resource) string {
+							return formatWithGraySuffix(res.DisplayString(), res.GetDisplaySuffix())
+						})
+
+						// Find saved resource index
+						if savedResID != "" {
+							if idx, ok := gui.resList.FindIndex(func(res *domain.Resource) bool {
+								return res.ID == savedResID
+							}); ok {
+								resTargetIndex = idx
+								utils.Log("refresh: Found resource at index %d", idx)
+							} else {
+								utils.Log("refresh: Saved resource not found in new data")
+							}
+						}
+					}
+				}
+			}
+		}
+
+		utils.Log("refresh: Updating UI with subIndex=%d, rgIndex=%d, resIndex=%d",
+			subTargetIndex, rgTargetIndex, resTargetIndex)
+
+		// Helper function to set cursor and adjust origin to keep cursor visible
+		setCursorWithOrigin := func(v *gocui.View, targetIndex int) {
+			_, height := v.Size()
+			// Calculate appropriate origin to keep cursor visible
+			// If target is within view height, origin stays at 0
+			// Otherwise, scroll so target is at bottom of view
+			var originY int
+			if targetIndex < height {
+				originY = 0
+			} else {
+				originY = targetIndex - height + 1
+			}
+			v.SetOrigin(0, originY)
+			v.SetCursor(0, targetIndex-originY)
+		}
+
+		// Update all panels in a single UI update
+		gui.g.UpdateAsync(func(g *gocui.Gui) error {
+			// Refresh subscriptions panel
+			gui.refreshSubscriptionsPanel()
+			if subTargetIndex >= 0 && gui.subscriptionsView != nil {
+				setCursorWithOrigin(gui.subscriptionsView, subTargetIndex)
+				gui.updateSubscriptionSelection(gui.subscriptionsView)
+				utils.Log("refresh: Set subscription cursor to %d", subTargetIndex)
+			}
+
+			// Refresh resource groups panel
+			gui.refreshResourceGroupsPanel()
+			if rgTargetIndex >= 0 && gui.resourceGroupsView != nil {
+				setCursorWithOrigin(gui.resourceGroupsView, rgTargetIndex)
+				gui.updateRGSelection(gui.resourceGroupsView)
+				utils.Log("refresh: Set RG cursor to %d", rgTargetIndex)
+			}
+
+			// Refresh resources panel
+			gui.refreshResourcesPanel()
+			if resTargetIndex >= 0 && gui.resourcesView != nil {
+				setCursorWithOrigin(gui.resourcesView, resTargetIndex)
+				gui.updateResSelection(gui.resourcesView)
+				utils.Log("refresh: Set resource cursor to %d", resTargetIndex)
+			}
+
+			gui.refreshMainPanel()
+			gui.updateStatus()
+			return nil
+		})
+	}()
+
 	return nil
 }
 
@@ -2677,6 +2881,194 @@ func (gui *Gui) loadResources(subscriptionID string, resourceGroupName string) {
 
 		gui.g.UpdateAsync(func(g *gocui.Gui) error {
 			gui.refreshResourcesPanel()
+			gui.refreshMainPanel()
+			gui.updateStatus()
+			return nil
+		})
+	}()
+}
+
+// loadSubscriptionsWithSelection loads subscriptions and restores cursor position
+func (gui *Gui) loadSubscriptionsWithSelection(savedSubID string) {
+	gui.mu.RLock()
+	subClient := gui.subClient
+	gui.mu.RUnlock()
+
+	if subClient == nil {
+		return
+	}
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		subs, err := subClient.ListSubscriptions(ctx)
+		if err != nil {
+			utils.Log("loadSubscriptionsWithSelection: Error: %v", err)
+			return
+		}
+
+		// Sort subscriptions alphabetically by name (case-insensitive)
+		sort.Slice(subs, func(i, j int) bool {
+			return strings.ToLower(subs[i].Name) < strings.ToLower(subs[j].Name)
+		})
+
+		gui.mu.Lock()
+		gui.subscriptions = subs
+		// Only set default selection if no saved selection exists
+		if len(subs) > 0 && gui.selectedSub == nil && savedSubID == "" {
+			gui.selectedSub = subs[0]
+		}
+		gui.mu.Unlock()
+
+		// Update filtered list
+		gui.subList.SetItems(subs, func(sub *domain.Subscription) string {
+			return formatWithGraySuffix(sub.DisplayString(), sub.GetDisplaySuffix())
+		})
+
+		// Find the index of the saved subscription in the filtered list
+		var targetIndex int = -1
+		if savedSubID != "" {
+			if idx, ok := gui.subList.FindIndex(func(sub *domain.Subscription) bool {
+				return sub.ID == savedSubID
+			}); ok {
+				targetIndex = idx
+			}
+		}
+
+		gui.g.UpdateAsync(func(g *gocui.Gui) error {
+			gui.refreshSubscriptionsPanel()
+			// Restore cursor position if we found the saved subscription
+			if targetIndex >= 0 && gui.subscriptionsView != nil {
+				gui.subscriptionsView.SetCursor(0, targetIndex)
+				// Update selection to match cursor
+				gui.updateSubscriptionSelection(gui.subscriptionsView)
+			}
+			gui.refreshMainPanel()
+			gui.updateStatus()
+			return nil
+		})
+	}()
+}
+
+// loadResourceGroupsWithSelection loads resource groups and restores cursor position
+func (gui *Gui) loadResourceGroupsWithSelection(subscriptionID, savedRGID string) {
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		rgClient, err := gui.clientFactory.NewResourceGroupsClient(subscriptionID)
+		if err != nil {
+			utils.Log("loadResourceGroupsWithSelection: Error creating client: %v", err)
+			return
+		}
+
+		rgs, err := rgClient.ListResourceGroups(ctx)
+		if err != nil {
+			utils.Log("loadResourceGroupsWithSelection: Error listing RGs: %v", err)
+			return
+		}
+
+		// Sort resource groups alphabetically by name (case-insensitive)
+		sort.Slice(rgs, func(i, j int) bool {
+			return strings.ToLower(rgs[i].Name) < strings.ToLower(rgs[j].Name)
+		})
+
+		gui.mu.Lock()
+		gui.resourceGroups = rgs
+		gui.rgClient = rgClient
+		// Only set default selection if no saved selection exists
+		if len(rgs) > 0 && savedRGID == "" {
+			gui.selectedRG = rgs[0]
+		}
+		gui.mu.Unlock()
+
+		// Update filtered list
+		gui.rgList.SetItems(rgs, func(rg *domain.ResourceGroup) string {
+			return formatWithGraySuffix(rg.DisplayString(), rg.GetDisplaySuffix())
+		})
+
+		// Find the index of the saved resource group in the filtered list
+		var targetIndex int = -1
+		if savedRGID != "" {
+			if idx, ok := gui.rgList.FindIndex(func(rg *domain.ResourceGroup) bool {
+				return rg.ID == savedRGID
+			}); ok {
+				targetIndex = idx
+			}
+		}
+
+		gui.g.UpdateAsync(func(g *gocui.Gui) error {
+			gui.refreshResourceGroupsPanel()
+			// Restore cursor position if we found the saved resource group
+			if targetIndex >= 0 && gui.resourceGroupsView != nil {
+				gui.resourceGroupsView.SetCursor(0, targetIndex)
+				// Update selection to match cursor
+				gui.updateRGSelection(gui.resourceGroupsView)
+			}
+			gui.refreshResourcesPanel()
+			gui.refreshMainPanel()
+			gui.updateStatus()
+			return nil
+		})
+	}()
+}
+
+// loadResourcesWithSelection loads resources and restores cursor position
+func (gui *Gui) loadResourcesWithSelection(subscriptionID, resourceGroupName, savedResID string) {
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		resClient, err := gui.clientFactory.NewResourcesClient(subscriptionID)
+		if err != nil {
+			utils.Log("loadResourcesWithSelection: Error creating client: %v", err)
+			return
+		}
+
+		resources, err := resClient.ListResourcesByResourceGroup(ctx, resourceGroupName)
+		if err != nil {
+			utils.Log("loadResourcesWithSelection: Error listing resources: %v", err)
+			return
+		}
+
+		// Sort resources alphabetically by name (case-insensitive)
+		sort.Slice(resources, func(i, j int) bool {
+			return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
+		})
+
+		gui.mu.Lock()
+		gui.resources = resources
+		gui.resClient = resClient
+		// Only set default selection if no saved selection exists
+		if len(resources) > 0 && savedResID == "" {
+			gui.selectedRes = resources[0]
+		}
+		gui.mu.Unlock()
+
+		// Update filtered list
+		gui.resList.SetItems(resources, func(res *domain.Resource) string {
+			return formatWithGraySuffix(res.DisplayString(), res.GetDisplaySuffix())
+		})
+
+		// Find the index of the saved resource in the filtered list
+		var targetIndex int = -1
+		if savedResID != "" {
+			if idx, ok := gui.resList.FindIndex(func(res *domain.Resource) bool {
+				return res.ID == savedResID
+			}); ok {
+				targetIndex = idx
+			}
+		}
+
+		gui.g.UpdateAsync(func(g *gocui.Gui) error {
+			gui.refreshResourcesPanel()
+			// Restore cursor position if we found the saved resource
+			if targetIndex >= 0 && gui.resourcesView != nil {
+				gui.resourcesView.SetCursor(0, targetIndex)
+				// Update selection to match cursor
+				gui.updateResSelection(gui.resourcesView)
+			}
 			gui.refreshMainPanel()
 			gui.updateStatus()
 			return nil

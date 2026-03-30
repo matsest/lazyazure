@@ -191,3 +191,17 @@ func (fl *FilteredList[T]) FindByOriginalIndex(originalIdx int) (int, bool) {
 	}
 	return -1, false
 }
+
+// FindIndex finds the filtered index of the first item that matches the given predicate
+// Returns the index and true if found, -1 and false otherwise
+func (fl *FilteredList[T]) FindIndex(matcher func(T) bool) (int, bool) {
+	fl.mu.RLock()
+	defer fl.mu.RUnlock()
+
+	for filteredIdx, originalIdx := range fl.indices {
+		if matcher(fl.allItems[originalIdx]) {
+			return filteredIdx, true
+		}
+	}
+	return -1, false
+}
