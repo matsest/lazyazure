@@ -9,7 +9,7 @@
 
 A TUI application for viewing Azure resources, inspired by [lazydocker](https://github.com/jesseduffield/lazydocker). Browse Azure subscriptions, resource groups, and resources with an interactive terminal interface.
 
-> **About This Project**: This project is vibe-coded with [OpenCode](https://opencode.ai). It is provided as-is without warranties ([MIT License](./LICENSE)). See [AGENTS.md](AGENTS.md) for development guidelines.
+> **About This Project**: Built through AI pair programming with [OpenCode](https://opencode.ai). See [AGENTS.md](AGENTS.md) for development guidelines and [Security](#Security) for security information. It is provided as-is without warranties ([MIT License](./LICENSE)). 
 
 ![demo](./demo.png)
 
