@@ -379,6 +379,13 @@ func (gui *Gui) setupKeybindings() error {
 	if err := gui.g.SetKeybinding("subscriptions", gocui.MouseWheelDown, gocui.ModNone, gui.nextSub); err != nil {
 		return err
 	}
+	// Page up/down for subscriptions panel
+	if err := gui.g.SetKeybinding("subscriptions", gocui.KeyPgup, gocui.ModNone, gui.pageUpSub); err != nil {
+		return err
+	}
+	if err := gui.g.SetKeybinding("subscriptions", gocui.KeyPgdn, gocui.ModNone, gui.pageDownSub); err != nil {
+		return err
+	}
 	utils.Log("setupKeybindings: Subscriptions navigation set")
 
 	// Resource Groups panel navigation
@@ -404,6 +411,13 @@ func (gui *Gui) setupKeybindings() error {
 	if err := gui.g.SetKeybinding("resourcegroups", gocui.MouseWheelDown, gocui.ModNone, gui.nextRG); err != nil {
 		return err
 	}
+	// Page up/down for resource groups panel
+	if err := gui.g.SetKeybinding("resourcegroups", gocui.KeyPgup, gocui.ModNone, gui.pageUpRG); err != nil {
+		return err
+	}
+	if err := gui.g.SetKeybinding("resourcegroups", gocui.KeyPgdn, gocui.ModNone, gui.pageDownRG); err != nil {
+		return err
+	}
 	utils.Log("setupKeybindings: Resource groups navigation set")
 
 	// Resources panel navigation
@@ -427,6 +441,13 @@ func (gui *Gui) setupKeybindings() error {
 		return err
 	}
 	if err := gui.g.SetKeybinding("resources", gocui.MouseWheelDown, gocui.ModNone, gui.nextRes); err != nil {
+		return err
+	}
+	// Page up/down for resources panel
+	if err := gui.g.SetKeybinding("resources", gocui.KeyPgup, gocui.ModNone, gui.pageUpRes); err != nil {
+		return err
+	}
+	if err := gui.g.SetKeybinding("resources", gocui.KeyPgdn, gocui.ModNone, gui.pageDownRes); err != nil {
 		return err
 	}
 	utils.Log("setupKeybindings: Resources navigation set")
@@ -1292,8 +1313,18 @@ func (gui *Gui) nextSub(g *gocui.Gui, v *gocui.View) error {
 	}
 
 	cx, cy := v.Cursor()
-	if cy < subCount-1 {
-		v.SetCursor(cx, cy+1)
+	_, height := v.Size()
+	ox, oy := v.Origin()
+
+	// Calculate absolute position and check if we can move
+	if oy+cy < subCount-1 {
+		if cy < height-1 {
+			// Move cursor within visible area
+			v.SetCursor(cx, cy+1)
+		} else {
+			// At bottom of view, scroll down
+			v.SetOrigin(ox, oy+1)
+		}
 		gui.updateSubscriptionSelection(v)
 		gui.refreshMainPanel()
 	}
@@ -1308,8 +1339,17 @@ func (gui *Gui) prevSub(g *gocui.Gui, v *gocui.View) error {
 	}
 
 	cx, cy := v.Cursor()
-	if cy > 0 {
-		v.SetCursor(cx, cy-1)
+	ox, oy := v.Origin()
+
+	// Calculate absolute position and check if we can move
+	if oy+cy > 0 {
+		if cy > 0 {
+			// Move cursor within visible area
+			v.SetCursor(cx, cy-1)
+		} else {
+			// At top of view, scroll up
+			v.SetOrigin(ox, oy-1)
+		}
 		gui.updateSubscriptionSelection(v)
 		gui.refreshMainPanel()
 	}
@@ -1318,7 +1358,9 @@ func (gui *Gui) prevSub(g *gocui.Gui, v *gocui.View) error {
 
 func (gui *Gui) updateSubscriptionSelection(v *gocui.View) {
 	_, cy := v.Cursor()
-	if sub, ok := gui.subList.Get(cy); ok {
+	_, oy := v.Origin()
+	// Calculate absolute index based on origin + cursor position
+	if sub, ok := gui.subList.Get(oy + cy); ok {
 		gui.mu.Lock()
 		gui.selectedSub = sub
 		gui.mu.Unlock()
@@ -1333,8 +1375,18 @@ func (gui *Gui) nextRG(g *gocui.Gui, v *gocui.View) error {
 	}
 
 	cx, cy := v.Cursor()
-	if cy < rgCount-1 {
-		v.SetCursor(cx, cy+1)
+	_, height := v.Size()
+	ox, oy := v.Origin()
+
+	// Calculate absolute position and check if we can move
+	if oy+cy < rgCount-1 {
+		if cy < height-1 {
+			// Move cursor within visible area
+			v.SetCursor(cx, cy+1)
+		} else {
+			// At bottom of view, scroll down
+			v.SetOrigin(ox, oy+1)
+		}
 		gui.updateRGSelection(v)
 		gui.refreshMainPanel()
 	}
@@ -1349,8 +1401,17 @@ func (gui *Gui) prevRG(g *gocui.Gui, v *gocui.View) error {
 	}
 
 	cx, cy := v.Cursor()
-	if cy > 0 {
-		v.SetCursor(cx, cy-1)
+	ox, oy := v.Origin()
+
+	// Calculate absolute position and check if we can move
+	if oy+cy > 0 {
+		if cy > 0 {
+			// Move cursor within visible area
+			v.SetCursor(cx, cy-1)
+		} else {
+			// At top of view, scroll up
+			v.SetOrigin(ox, oy-1)
+		}
 		gui.updateRGSelection(v)
 		gui.refreshMainPanel()
 	}
@@ -1359,7 +1420,9 @@ func (gui *Gui) prevRG(g *gocui.Gui, v *gocui.View) error {
 
 func (gui *Gui) updateRGSelection(v *gocui.View) {
 	_, cy := v.Cursor()
-	if rg, ok := gui.rgList.Get(cy); ok {
+	_, oy := v.Origin()
+	// Calculate absolute index based on origin + cursor position
+	if rg, ok := gui.rgList.Get(oy + cy); ok {
 		gui.mu.Lock()
 		gui.selectedRG = rg
 		gui.mu.Unlock()
@@ -1378,8 +1441,18 @@ func (gui *Gui) nextRes(g *gocui.Gui, v *gocui.View) error {
 	}
 
 	cx, cy := v.Cursor()
-	if cy < resCount-1 {
-		v.SetCursor(cx, cy+1)
+	_, height := v.Size()
+	ox, oy := v.Origin()
+
+	// Calculate absolute position and check if we can move
+	if oy+cy < resCount-1 {
+		if cy < height-1 {
+			// Move cursor within visible area
+			v.SetCursor(cx, cy+1)
+		} else {
+			// At bottom of view, scroll down
+			v.SetOrigin(ox, oy+1)
+		}
 		gui.updateResSelection(v)
 		gui.refreshMainPanel()
 	}
@@ -1394,8 +1467,17 @@ func (gui *Gui) prevRes(g *gocui.Gui, v *gocui.View) error {
 	}
 
 	cx, cy := v.Cursor()
-	if cy > 0 {
-		v.SetCursor(cx, cy-1)
+	ox, oy := v.Origin()
+
+	// Calculate absolute position and check if we can move
+	if oy+cy > 0 {
+		if cy > 0 {
+			// Move cursor within visible area
+			v.SetCursor(cx, cy-1)
+		} else {
+			// At top of view, scroll up
+			v.SetOrigin(ox, oy-1)
+		}
 		gui.updateResSelection(v)
 		gui.refreshMainPanel()
 	}
@@ -1404,7 +1486,9 @@ func (gui *Gui) prevRes(g *gocui.Gui, v *gocui.View) error {
 
 func (gui *Gui) updateResSelection(v *gocui.View) {
 	_, cy := v.Cursor()
-	if res, ok := gui.resList.Get(cy); ok {
+	_, oy := v.Origin()
+	// Calculate absolute index based on origin + cursor position
+	if res, ok := gui.resList.Get(oy + cy); ok {
 		gui.mu.Lock()
 		gui.selectedRes = res
 		gui.mu.Unlock()
@@ -1415,13 +1499,150 @@ func (gui *Gui) updateResSelection(v *gocui.View) {
 	}
 }
 
+// Page up/down functions for subscriptions
+func (gui *Gui) pageDownSub(g *gocui.Gui, v *gocui.View) error {
+	subCount := gui.subList.Len()
+	if subCount == 0 {
+		return nil
+	}
+
+	_, height := v.Size()
+	ox, oy := v.Origin()
+	maxOy := subCount - height
+	if maxOy < 0 {
+		maxOy = 0
+	}
+
+	// Scroll down by page, keeping cursor position
+	newOy := oy + height - 1
+	if newOy > maxOy {
+		newOy = maxOy
+	}
+	v.SetOrigin(ox, newOy)
+	gui.updateSubscriptionSelection(v)
+	gui.refreshMainPanel()
+	return nil
+}
+
+func (gui *Gui) pageUpSub(g *gocui.Gui, v *gocui.View) error {
+	subCount := gui.subList.Len()
+	if subCount == 0 {
+		return nil
+	}
+
+	_, height := v.Size()
+	ox, oy := v.Origin()
+
+	// Scroll up by page, keeping cursor position
+	if oy > height-1 {
+		v.SetOrigin(ox, oy-(height-1))
+	} else if oy > 0 {
+		v.SetOrigin(ox, 0)
+	}
+	gui.updateSubscriptionSelection(v)
+	gui.refreshMainPanel()
+	return nil
+}
+
+// Page up/down functions for resource groups
+func (gui *Gui) pageDownRG(g *gocui.Gui, v *gocui.View) error {
+	rgCount := gui.rgList.Len()
+	if rgCount == 0 {
+		return nil
+	}
+
+	_, height := v.Size()
+	ox, oy := v.Origin()
+	maxOy := rgCount - height
+	if maxOy < 0 {
+		maxOy = 0
+	}
+
+	// Scroll down by page, keeping cursor position
+	newOy := oy + height - 1
+	if newOy > maxOy {
+		newOy = maxOy
+	}
+	v.SetOrigin(ox, newOy)
+	gui.updateRGSelection(v)
+	gui.refreshMainPanel()
+	return nil
+}
+
+func (gui *Gui) pageUpRG(g *gocui.Gui, v *gocui.View) error {
+	rgCount := gui.rgList.Len()
+	if rgCount == 0 {
+		return nil
+	}
+
+	_, height := v.Size()
+	ox, oy := v.Origin()
+
+	// Scroll up by page, keeping cursor position
+	if oy > height-1 {
+		v.SetOrigin(ox, oy-(height-1))
+	} else if oy > 0 {
+		v.SetOrigin(ox, 0)
+	}
+	gui.updateRGSelection(v)
+	gui.refreshMainPanel()
+	return nil
+}
+
+// Page up/down functions for resources
+func (gui *Gui) pageDownRes(g *gocui.Gui, v *gocui.View) error {
+	resCount := gui.resList.Len()
+	if resCount == 0 {
+		return nil
+	}
+
+	_, height := v.Size()
+	ox, oy := v.Origin()
+	maxOy := resCount - height
+	if maxOy < 0 {
+		maxOy = 0
+	}
+
+	// Scroll down by page, keeping cursor position
+	newOy := oy + height - 1
+	if newOy > maxOy {
+		newOy = maxOy
+	}
+	v.SetOrigin(ox, newOy)
+	gui.updateResSelection(v)
+	gui.refreshMainPanel()
+	return nil
+}
+
+func (gui *Gui) pageUpRes(g *gocui.Gui, v *gocui.View) error {
+	resCount := gui.resList.Len()
+	if resCount == 0 {
+		return nil
+	}
+
+	_, height := v.Size()
+	ox, oy := v.Origin()
+
+	// Scroll up by page, keeping cursor position
+	if oy > height-1 {
+		v.SetOrigin(ox, oy-(height-1))
+	} else if oy > 0 {
+		v.SetOrigin(ox, 0)
+	}
+	gui.updateResSelection(v)
+	gui.refreshMainPanel()
+	return nil
+}
+
 func (gui *Gui) onSubEnter(g *gocui.Gui, v *gocui.View) error {
 	if gui.subList.Len() == 0 {
 		return nil
 	}
 
 	_, cy := v.Cursor()
-	if sub, ok := gui.subList.Get(cy); ok {
+	_, oy := v.Origin()
+	// Calculate absolute index based on origin + cursor position
+	if sub, ok := gui.subList.Get(oy + cy); ok {
 		gui.mu.Lock()
 		gui.selectedSub = sub
 		subID := sub.ID
@@ -1447,7 +1668,9 @@ func (gui *Gui) onRGEnter(g *gocui.Gui, v *gocui.View) error {
 	}
 
 	_, cy := v.Cursor()
-	if rg, ok := gui.rgList.Get(cy); ok {
+	_, oy := v.Origin()
+	// Calculate absolute index based on origin + cursor position
+	if rg, ok := gui.rgList.Get(oy + cy); ok {
 		gui.mu.Lock()
 		gui.selectedRG = rg
 		rgName := rg.Name
@@ -1474,7 +1697,9 @@ func (gui *Gui) onResEnter(g *gocui.Gui, v *gocui.View) error {
 	}
 
 	_, cy := v.Cursor()
-	if selectedRes, ok := gui.resList.Get(cy); ok {
+	_, oy := v.Origin()
+	// Calculate absolute index based on origin + cursor position
+	if selectedRes, ok := gui.resList.Get(oy + cy); ok {
 		// Set selectedRes immediately so basic info shows while loading
 		gui.mu.Lock()
 		gui.selectedRes = selectedRes

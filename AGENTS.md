@@ -183,7 +183,7 @@ az login  # Optional - only one of many auth methods
 When implementing features or fixes:
 - **New or changed domain models?** Add JSON serialization tests in `pkg/domain/`
 - **New or changed Azure client methods?** Add client tests in `pkg/azure/`
-- **New or changed GUI features?** Add tests in `pkg/gui/` if applicable and run the automated TUI testing with tmux
+- **New or changed GUI features?** You MUST use automated TUI testing with tmux - see section 6.1 below
 - **Bug fixes?** Add a test that would have caught the bug
 
 Run tests frequently:
@@ -197,9 +197,27 @@ Key test files:
 - `pkg/gui/gui_test.go` - GUI tests
 - `pkg/domain/domain_test.go` - Domain model tests (JSON tags, helpers)
 
-### 6.1 Automated TUI Testing with tmux
+### 6.1 Automated TUI Testing with tmux (REQUIRED for GUI changes)
 
-For programmatic TUI testing using tmux, see [docs/TUI_TESTING.md](docs/TUI_TESTING.md).
+**For any GUI changes (navigation, scrolling, panels, keybindings), you MUST use automated TUI testing with tmux.**
+
+Do NOT attempt to test TUI applications by running them directly - they require a TTY which is not available in this environment. Instead, use tmux as documented in [docs/TUI_TESTING.md](docs/TUI_TESTING.md).
+
+**Required for GUI changes:**
+1. Create or update a test script in `scripts/test-*.sh`
+2. Use `tmux` to programmatically control the application
+3. Send keystrokes and capture pane content to verify behavior
+4. Run the test to verify the fix works
+
+**Example workflow for GUI bug fixes:**
+```bash
+# 1. Create test script (e.g., scripts/test-scrolling.sh)
+# 2. Make the script executable
+chmod +x scripts/test-scrolling.sh
+
+# 3. Run the test
+./scripts/test-scrolling.sh
+```
 
 **Capabilities:**
 - **Text-based testing**: Capture pane content for assertions (works in any environment including CI/CD)
@@ -210,6 +228,16 @@ For programmatic TUI testing using tmux, see [docs/TUI_TESTING.md](docs/TUI_TEST
 - Required: `tmux`
 - For screenshots: `grim` (Wayland), `import` (ImageMagick, X11), or `scrot`
 - Note: Screenshot tools require visible terminal window and active display server
+
+**Demo mode for testing:**
+Always use `LAZYAZURE_DEMO=1` (small dataset) or `LAZYAZURE_DEMO=2` (large dataset) for testing to avoid Azure credential requirements:
+```bash
+# Small dataset: 2 subs, 4 RGs each, 2-4 resources
+LAZYAZURE_DEMO=1 ./lazyazure
+
+# Large dataset: 15 subs, 20 RGs each, 15 resources (4,500 total) - good for testing scrolling
+LAZYAZURE_DEMO=2 ./lazyazure
+```
 
 ### 7. Common Issues and Fixes
 
