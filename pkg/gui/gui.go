@@ -2544,6 +2544,11 @@ func (gui *Gui) loadSubscriptions() {
 			return
 		}
 
+		// Sort subscriptions alphabetically by name (case-insensitive)
+		sort.Slice(subs, func(i, j int) bool {
+			return strings.ToLower(subs[i].Name) < strings.ToLower(subs[j].Name)
+		})
+
 		gui.mu.Lock()
 		gui.subscriptions = subs
 		if len(subs) > 0 && gui.selectedSub == nil {
@@ -2581,6 +2586,11 @@ func (gui *Gui) loadResourceGroups(subscriptionID string) {
 			utils.Log("loadResourceGroups: Error listing RGs: %v", err)
 			return
 		}
+
+		// Sort resource groups alphabetically by name (case-insensitive)
+		sort.Slice(rgs, func(i, j int) bool {
+			return strings.ToLower(rgs[i].Name) < strings.ToLower(rgs[j].Name)
+		})
 
 		gui.mu.Lock()
 		gui.resourceGroups = rgs
@@ -2630,6 +2640,11 @@ func (gui *Gui) loadResources(subscriptionID string, resourceGroupName string) {
 			utils.Log("loadResources: Error listing resources: %v", err)
 			return
 		}
+
+		// Sort resources alphabetically by name (case-insensitive)
+		sort.Slice(resources, func(i, j int) bool {
+			return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
+		})
 
 		gui.mu.Lock()
 		gui.resources = resources
