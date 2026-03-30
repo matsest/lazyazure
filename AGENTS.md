@@ -289,7 +289,8 @@ go build .
 LAZYAZURE_DEBUG=1 ./lazyazure
 
 # Run in demo mode (mock data, no Azure credentials needed)
-LAZYAZURE_DEMO=1 ./lazyazure
+LAZYAZURE_DEMO=1 ./lazyazure  # Small dataset: 2 subs, 4 RGs each, 2-4 resources
+LAZYAZURE_DEMO=2 ./lazyazure  # Large dataset: 15 subs, 20 RGs each, 15 resources (4,500 total)
 
 # Check version
 ./lazyazure --version
@@ -319,7 +320,7 @@ pkg/
 │   ├── resources.go         # Generic resource operations
 │   └── api_versions.go      # Dynamic API version lookup
 ├── demo/           # Demo mode (mock Azure data)
-│   ├── data.go              # Mock data structures
+│   ├── data.go              # Mock data structures (LAZYAZURE_DEMO=1 and LAZYAZURE_DEMO=2)
 │   ├── client.go            # Demo client implementing AzureClient interface
 │   └── client_test.go       # Demo client tests
 ├── domain/         # Domain models (structs)

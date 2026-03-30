@@ -174,11 +174,12 @@ func main() {
 	var clientFactory gui.AzureClientFactory
 
 	// Check if demo mode is enabled
-	if os.Getenv("LAZYAZURE_DEMO") == "1" {
-		utils.Log("Demo mode enabled")
+	demoMode := os.Getenv("LAZYAZURE_DEMO")
+	if demoMode == "1" || demoMode == "2" {
+		utils.Log("Demo mode enabled (mode=%s)", demoMode)
 
-		// Create demo client
-		demoClient := demo.NewClient()
+		// Create demo client with specified mode
+		demoClient := demo.NewClientWithMode(demoMode)
 		azureClient = demoClient
 		clientFactory = demoClient
 

@@ -429,3 +429,127 @@ func TestDemoResourceGroupsStructure(t *testing.T) {
 		}
 	}
 }
+
+// Test large demo data creation and structure
+func TestNewLargeDemoData(t *testing.T) {
+	data := NewLargeDemoData()
+
+	if data == nil {
+		t.Fatal("NewLargeDemoData returned nil")
+	}
+
+	// Check user
+	if data.User == nil {
+		t.Fatal("Large demo user is nil")
+	}
+	if data.User.DisplayName != "Demo Administrator" {
+		t.Errorf("Expected DisplayName='Demo Administrator', got %q", data.User.DisplayName)
+	}
+
+	// Check subscriptions count
+	if len(data.Subscriptions) != 15 {
+		t.Errorf("Expected 15 subscriptions, got %d", len(data.Subscriptions))
+	}
+
+	// Check resource groups count per subscription
+	for _, sub := range data.Subscriptions {
+		rgs := data.GetResourceGroups(sub.ID)
+		if len(rgs) != 20 {
+			t.Errorf("Expected 20 resource groups for subscription %s, got %d", sub.Name, len(rgs))
+		}
+
+		// Check resources count per resource group
+		for _, rg := range rgs {
+			resources := data.GetResources(rg.Name)
+			if len(resources) != 15 {
+				t.Errorf("Expected 15 resources for RG %s, got %d", rg.Name, len(resources))
+			}
+
+			// Verify all resources have required fields
+			for _, res := range resources {
+				if res.Name == "" {
+					t.Errorf("Resource in RG %s has empty name", rg.Name)
+				}
+				if res.Type == "" {
+					t.Errorf("Resource %s has empty type", res.Name)
+				}
+				if res.Location == "" {
+					t.Errorf("Resource %s has empty location", res.Name)
+				}
+				if res.ID == "" {
+					t.Errorf("Resource %s has empty ID", res.Name)
+				}
+			}
+		}
+	}
+}
+
+// Test NewClientWithMode creates appropriate dataset sizes
+func TestNewClientWithMode(t *testing.T) {
+	// Test mode "1" (small dataset)
+	client1 := NewClientWithMode("1")
+	if client1.mode != "1" {
+		t.Errorf("Expected mode='1', got %q", client1.mode)
+	}
+	if len(client1.data.Subscriptions) != 2 {
+		t.Errorf("Mode 1: Expected 2 subscriptions, got %d", len(client1.data.Subscriptions))
+	}
+
+	// Test mode "2" (large dataset)
+	client2 := NewClientWithMode("2")
+	if client2.mode != "2" {
+		t.Errorf("Expected mode='2', got %q", client2.mode)
+	}
+	if len(client2.data.Subscriptions) != 15 {
+		t.Errorf("Mode 2: Expected 15 subscriptions, got %d", len(client2.data.Subscriptions))
+	}
+}
+
+// Test large demo data resource type variety
+func TestLargeDemoDataResourceVariety(t *testing.T) {
+	data := NewLargeDemoData()
+
+	// Collect all unique resource types
+	typeCount := make(map[string]int)
+	for _, resources := range data.Resources {
+		for _, res := range resources {
+			typeCount[res.Type]++
+		}
+	}
+
+	// Should have multiple different resource types
+	if len(typeCount) < 10 {
+		t.Errorf("Expected at least 10 different resource types, got %d", len(typeCount))
+	}
+
+	// Each resource type from the config should appear
+	for _, resTypeConfig := range resourceTypesForDemo {
+		if _, ok := typeCount[resTypeConfig.Type]; !ok {
+			t.Errorf("Resource type %q not found in large demo data", resTypeConfig.Type)
+		}
+	}
+}
+
+// Test large demo data subscription variety
+func TestLargeDemoDataSubscriptionVariety(t *testing.T) {
+	data := NewLargeDemoData()
+
+	// Check that all subscription names are unique
+	names := make(map[string]bool)
+	for _, sub := range data.Subscriptions {
+		if names[sub.Name] {
+			t.Errorf("Duplicate subscription name: %s", sub.Name)
+		}
+		names[sub.Name] = true
+	}
+
+	// Expected subscription names
+	expectedSubs := []string{"Prod-East", "Prod-West", "Prod-Central", "Dev-East", "Dev-West",
+		"Staging", "QA-Environment", "Testing", "Sandbox", "Demo-Tenant",
+		"Production-UK", "Production-APAC", "Development-Experimental", "Training", "Pre-Production"}
+	for _, expected := range expectedSubs {
+		if !names[expected] {
+			t.Errorf("Expected subscription %q not found", expected)
+		}
+	}
+}

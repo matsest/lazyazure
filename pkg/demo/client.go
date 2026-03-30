@@ -16,14 +16,35 @@ type Client struct {
 	data      *DemoData
 	token     string
 	startTime time.Time
+	mode      string
 }
 
-// NewClient creates a new demo client with mock data
+// NewClient creates a new demo client with mock data (small dataset)
 func NewClient() *Client {
 	return &Client{
 		data:      NewDemoData(),
 		token:     "demo-token-for-demo-mode",
 		startTime: time.Now(),
+		mode:      "1",
+	}
+}
+
+// NewClientWithMode creates a new demo client with specified mode
+// Mode "1": Small dataset (2 subs, 4 RGs each, 2-4 resources each)
+// Mode "2": Large dataset (10 subs, 15 RGs each, 15 resources each)
+func NewClientWithMode(mode string) *Client {
+	var data *DemoData
+	if mode == "2" {
+		data = NewLargeDemoData()
+	} else {
+		data = NewDemoData()
+	}
+
+	return &Client{
+		data:      data,
+		token:     "demo-token-for-demo-mode",
+		startTime: time.Now(),
+		mode:      mode,
 	}
 }
 

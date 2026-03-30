@@ -189,13 +189,17 @@ LazyAzure includes a demo mode that runs with mock Azure data - no Azure credent
 To run in demo mode:
 
 ```bash
+# Small dataset (2 subs, 4 RGs each, 2-4 resources each)
 LAZYAZURE_DEMO=1 lazyazure
+
+# Large dataset (15 subs, 20 RGs each, 15 resources = 4,500 total resources)
+LAZYAZURE_DEMO=2 lazyazure
 ```
 
 Demo mode provides:
-- 2 mock subscriptions (Demo Production & Demo Development)
-- 4 resource groups per subscription with various locations
-- Multiple resource types (Storage Accounts, Key Vaults, VMs, SQL Databases, Load Balancers)
+- Multiple mock subscriptions with different environments (Production, Development, Staging, etc.)
+- Resource groups per subscription with various purposes (networking, databases, web-apps, etc.)
+- 15 different Azure resource types (VMs, Storage Accounts, Key Vaults, SQL Databases, Load Balancers, etc.)
 - Realistic nested properties and tags
 - Simulated API response times for authentic feel
 

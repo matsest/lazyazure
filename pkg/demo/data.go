@@ -1,6 +1,7 @@
 package demo
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/matsest/lazyazure/pkg/domain"
@@ -383,4 +384,453 @@ func (d *DemoData) GetResource(resourceID string) *domain.Resource {
 		}
 	}
 	return nil
+}
+
+// Large demo data constants
+const (
+	numLargeSubscriptions   = 15
+	numResourceGroupsPerSub = 20
+	numResourcesPerRG       = 15
+)
+
+// Subscription configurations for large demo
+var largeSubscriptionConfigs = []struct {
+	Name  string
+	State string
+}{
+	{"Prod-East", "Enabled"},
+	{"Prod-West", "Enabled"},
+	{"Prod-Central", "Enabled"},
+	{"Dev-East", "Enabled"},
+	{"Dev-West", "Enabled"},
+	{"Staging", "Enabled"},
+	{"QA-Environment", "Enabled"},
+	{"Testing", "Enabled"},
+	{"Sandbox", "Enabled"},
+	{"Demo-Tenant", "Enabled"},
+	{"Production-UK", "Enabled"},
+	{"Production-APAC", "Enabled"},
+	{"Development-Experimental", "Enabled"},
+	{"Training", "Enabled"},
+	{"Pre-Production", "Enabled"},
+}
+
+// Resource group types/purposes
+var resourceGroupTypes = []string{
+	"networking",
+	"web-apps",
+	"databases",
+	"analytics",
+	"storage",
+	"compute",
+	"security",
+	"monitoring",
+	"identity",
+	"containers",
+	"integration",
+	"backup",
+	"devtools",
+	"shared-services",
+	"workloads",
+	"frontend",
+	"api-gateways",
+	"message-queues",
+	"caching",
+	"ai-ml",
+}
+
+// Azure resource types for large demo (realistic mix)
+var resourceTypesForDemo = []struct {
+	Type       string
+	Locations  []string
+	Properties map[string]interface{}
+}{
+	{
+		Type:      "Microsoft.Compute/virtualMachines",
+		Locations: []string{"eastus", "westus2", "westeurope", "southeastasia"},
+		Properties: map[string]interface{}{
+			"hardwareProfile": map[string]interface{}{"vmSize": "Standard_D2s_v3"},
+			"storageProfile": map[string]interface{}{
+				"osDisk": map[string]interface{}{
+					"osType": "Linux", "createOption": "FromImage",
+					"managedDisk": map[string]interface{}{"storageAccountType": "Premium_LRS"},
+				},
+			},
+		},
+	},
+	{
+		Type:      "Microsoft.Storage/storageAccounts",
+		Locations: []string{"eastus", "westus2", "westeurope"},
+		Properties: map[string]interface{}{
+			"accessTier": "Hot", "minimumTlsVersion": "TLS1_2",
+			"supportsHttpsTrafficOnly": true,
+		},
+	},
+	{
+		Type:      "Microsoft.KeyVault/vaults",
+		Locations: []string{"eastus", "westus2", "westeurope"},
+		Properties: map[string]interface{}{
+			"sku":                       map[string]interface{}{"family": "A", "name": "standard"},
+			"enableRbacAuthorization":   true,
+			"enableSoftDelete":          true,
+			"softDeleteRetentionInDays": 90,
+		},
+	},
+	{
+		Type:      "Microsoft.Sql/servers/databases",
+		Locations: []string{"eastus", "westus2"},
+		Properties: map[string]interface{}{
+			"collation":    "SQL_Latin1_General_CP1_CI_AS",
+			"maxSizeBytes": 10737418240,
+			"status":       "Online",
+		},
+	},
+	{
+		Type:      "Microsoft.Network/virtualNetworks",
+		Locations: []string{"eastus", "westus2", "westeurope", "southeastasia"},
+		Properties: map[string]interface{}{
+			"addressSpace": map[string]interface{}{
+				"addressPrefixes": []string{"10.0.0.0/16"},
+			},
+		},
+	},
+	{
+		Type:      "Microsoft.Network/networkSecurityGroups",
+		Locations: []string{"eastus", "westus2", "westeurope"},
+		Properties: map[string]interface{}{
+			"securityRules": []map[string]interface{}{
+				{
+					"name": "AllowSSH",
+					"properties": map[string]interface{}{
+						"protocol": "Tcp", "sourcePortRange": "*",
+						"destinationPortRange": "22", "access": "Allow",
+						"priority": 100, "direction": "Inbound",
+					},
+				},
+			},
+		},
+	},
+	{
+		Type:      "Microsoft.Network/loadBalancers",
+		Locations: []string{"eastus", "westus2"},
+		Properties: map[string]interface{}{
+			"sku": map[string]interface{}{"name": "Standard", "tier": "Regional"},
+		},
+	},
+	{
+		Type:      "Microsoft.Network/publicIPAddresses",
+		Locations: []string{"eastus", "westus2", "westeurope"},
+		Properties: map[string]interface{}{
+			"publicIPAllocationMethod": "Static",
+			"sku":                      map[string]interface{}{"name": "Standard"},
+		},
+	},
+	{
+		Type:      "Microsoft.Web/sites",
+		Locations: []string{"eastus", "westus2", "westeurope"},
+		Properties: map[string]interface{}{
+			"enabled":               true,
+			"httpsOnly":             true,
+			"clientAffinityEnabled": false,
+			"reserved":              false,
+		},
+	},
+	{
+		Type:      "Microsoft.Web/serverFarms",
+		Locations: []string{"eastus", "westus2"},
+		Properties: map[string]interface{}{
+			"sku": map[string]interface{}{
+				"name": "P1v2", "tier": "Premium", "size": "P1v2",
+			},
+		},
+	},
+	{
+		Type:      "Microsoft.ContainerService/managedClusters",
+		Locations: []string{"eastus", "westus2", "westeurope"},
+		Properties: map[string]interface{}{
+			"kubernetesVersion": "1.28.0",
+			"dnsPrefix":         "aks-cluster",
+			"agentPoolProfiles": []map[string]interface{}{
+				{
+					"name":   "nodepool1",
+					"count":  3,
+					"vmSize": "Standard_D2s_v3",
+					"osType": "Linux",
+				},
+			},
+		},
+	},
+	{
+		Type:      "Microsoft.ContainerRegistry/registries",
+		Locations: []string{"eastus", "westus2"},
+		Properties: map[string]interface{}{
+			"sku":              map[string]interface{}{"name": "Standard"},
+			"adminUserEnabled": true,
+		},
+	},
+	{
+		Type:      "Microsoft.OperationalInsights/workspaces",
+		Locations: []string{"eastus", "westus2"},
+		Properties: map[string]interface{}{
+			"sku":             map[string]interface{}{"name": "PerGB2018"},
+			"retentionInDays": 30,
+		},
+	},
+	{
+		Type:      "Microsoft.Insights/components",
+		Locations: []string{"eastus", "westus2"},
+		Properties: map[string]interface{}{
+			"Application_Type": "web",
+			"RetentionInDays":  90,
+		},
+	},
+	{
+		Type:      "Microsoft.EventHub/namespaces",
+		Locations: []string{"eastus", "westus2"},
+		Properties: map[string]interface{}{
+			"sku": map[string]interface{}{
+				"name": "Standard", "tier": "Standard", "capacity": 1,
+			},
+		},
+	},
+}
+
+// NewLargeDemoData creates a comprehensive demo dataset for realistic testing
+// 10 subscriptions × 15 resource groups × 15 resources = 2,250 total resources
+func NewLargeDemoData() *DemoData {
+	data := &DemoData{
+		User: &domain.User{
+			DisplayName:       "Demo Administrator",
+			UserPrincipalName: "demo.admin@contoso.com",
+			Type:              "user",
+			TenantID:          "00000000-0000-0000-0000-000000000000",
+		},
+		Subscriptions:  createLargeDemoSubscriptions(),
+		ResourceGroups: make(map[string][]*domain.ResourceGroup),
+		Resources:      make(map[string][]*domain.Resource),
+	}
+
+	// Create resource groups for each subscription
+	for _, sub := range data.Subscriptions {
+		data.ResourceGroups[sub.ID] = createLargeDemoResourceGroups(sub.ID, sub.Name)
+	}
+
+	// Create resources for each resource group
+	for _, rgs := range data.ResourceGroups {
+		for _, rg := range rgs {
+			data.Resources[rg.Name] = createLargeDemoResources(subIDFromRGID(rg.ID), rg)
+		}
+	}
+
+	return data
+}
+
+func createLargeDemoSubscriptions() []*domain.Subscription {
+	subs := make([]*domain.Subscription, numLargeSubscriptions)
+	for i := 0; i < numLargeSubscriptions; i++ {
+		config := largeSubscriptionConfigs[i]
+		subs[i] = &domain.Subscription{
+			ID:       fmt.Sprintf("00000000-0000-0000-0000-%012d", i+1),
+			Name:     config.Name,
+			State:    config.State,
+			TenantID: "00000000-0000-0000-0000-000000000000",
+		}
+	}
+	return subs
+}
+
+func createLargeDemoResourceGroups(subscriptionID string, subscriptionName string) []*domain.ResourceGroup {
+	rgs := make([]*domain.ResourceGroup, numResourceGroupsPerSub)
+	prefix := getEnvironmentPrefix(subscriptionName)
+
+	locations := []string{"eastus", "westus2", "westeurope", "southeastasia", "northeurope"}
+	teams := []string{"platform", "data", "security", "devops", "backend", "frontend", "infrastructure", "sre", "compliance"}
+	costCenters := []string{"IT-001", "IT-002", "IT-003", "ENG-001", "ENG-002", "OPS-001", "SEC-001"}
+
+	for i := 0; i < numResourceGroupsPerSub; i++ {
+		rgType := resourceGroupTypes[i%len(resourceGroupTypes)]
+		location := locations[i%len(locations)]
+		team := teams[i%len(teams)]
+		costCenter := costCenters[i%len(costCenters)]
+
+		rgs[i] = &domain.ResourceGroup{
+			Name:              fmt.Sprintf("rg-%s-%s-%02d", prefix, rgType, i+1),
+			Location:          location,
+			ID:                fmt.Sprintf("/subscriptions/%s/resourceGroups/rg-%s-%s-%02d", subscriptionID, prefix, rgType, i+1),
+			ProvisioningState: "Succeeded",
+			Tags: map[string]string{
+				"Environment": prefix,
+				"Team":        team,
+				"CostCenter":  costCenter,
+				"Project":     fmt.Sprintf("project-%s", rgType),
+			},
+			SubscriptionID: subscriptionID,
+		}
+	}
+	return rgs
+}
+
+func getEnvironmentPrefix(subName string) string {
+	switch {
+	case contains(subName, "Prod"):
+		return "prod"
+	case contains(subName, "Dev"):
+		return "dev"
+	case contains(subName, "Staging"):
+		return "stg"
+	case contains(subName, "QA"):
+		return "qa"
+	case contains(subName, "Testing"):
+		return "test"
+	case contains(subName, "Sandbox"):
+		return "sandbox"
+	default:
+		return "demo"
+	}
+}
+
+func createLargeDemoResources(subscriptionID string, rg *domain.ResourceGroup) []*domain.Resource {
+	createdTime := time.Now().AddDate(0, -6, -int(subscriptionID[35]-'0')*10).Format(time.RFC3339)
+	changedTime := time.Now().AddDate(0, -1, -int(subscriptionID[35]-'0')*5).Format(time.RFC3339)
+
+	resources := make([]*domain.Resource, numResourcesPerRG)
+	baseID := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers", subscriptionID, rg.Name)
+
+	// Generate varied purposes based on resource group type
+	purposes := generatePurposesForRGType(rg.Name)
+
+	for i := 0; i < numResourcesPerRG; i++ {
+		// Pick a resource type (cycle through available types)
+		resTypeConfig := resourceTypesForDemo[i%len(resourceTypesForDemo)]
+		location := resTypeConfig.Locations[i%len(resTypeConfig.Locations)]
+
+		// Generate unique name
+		resName := fmt.Sprintf("%s-%s-%02d", rg.Name[3:], getShortResourceTypeName(resTypeConfig.Type), i+1)
+
+		// Build resource ID
+		resID := fmt.Sprintf("%s/%s/%s", baseID, resTypeConfig.Type, resName)
+
+		resources[i] = &domain.Resource{
+			ID:             resID,
+			Name:           resName,
+			Type:           resTypeConfig.Type,
+			Location:       location,
+			ResourceGroup:  rg.Name,
+			SubscriptionID: subscriptionID,
+			Tags: map[string]string{
+				"Purpose":   purposes[i%len(purposes)],
+				"ManagedBy": "terraform",
+			},
+			Properties:  copyProperties(resTypeConfig.Properties),
+			CreatedTime: createdTime,
+			ChangedTime: changedTime,
+		}
+	}
+
+	return resources
+}
+
+func getShortResourceTypeName(fullType string) string {
+	parts := splitString(fullType, '/')
+	if len(parts) > 0 {
+		lastPart := parts[len(parts)-1]
+		// Shorten common names
+		shortNames := map[string]string{
+			"virtualMachines":       "vm",
+			"storageAccounts":       "sa",
+			"vaults":                "kv",
+			"databases":             "db",
+			"virtualNetworks":       "vnet",
+			"networkSecurityGroups": "nsg",
+			"loadBalancers":         "lb",
+			"publicIPAddresses":     "pip",
+			"sites":                 "app",
+			"serverFarms":           "plan",
+			"managedClusters":       "aks",
+			"registries":            "acr",
+			"workspaces":            "law",
+			"components":            "ai",
+			"namespaces":            "evh",
+		}
+		if short, ok := shortNames[lastPart]; ok {
+			return short
+		}
+		return lastPart
+	}
+	return "res"
+}
+
+func copyProperties(props map[string]interface{}) map[string]interface{} {
+	if props == nil {
+		return nil
+	}
+	copy := make(map[string]interface{}, len(props))
+	for k, v := range props {
+		copy[k] = v
+	}
+	return copy
+}
+
+func generatePurposesForRGType(rgName string) []string {
+	if contains(rgName, "networking") {
+		return []string{"vpc", "firewall", "load-balancing", "vpn", "dns", "cdn", "expressroute", "ddos"}
+	}
+	if contains(rgName, "web-apps") {
+		return []string{"frontend", "api", "microservice", "static-site", "spa", "mobile-backend"}
+	}
+	if contains(rgName, "databases") {
+		return []string{"oltp", "analytics", "cache", "search", "nosql", "timeseries", "graph"}
+	}
+	if contains(rgName, "analytics") {
+		return []string{"data-warehouse", "lake", "stream", "bi", "ml", "reporting"}
+	}
+	if contains(rgName, "storage") {
+		return []string{"blob", "files", "queues", "tables", "archive", "backup"}
+	}
+	if contains(rgName, "compute") {
+		return []string{"web-server", "app-server", "batch", "hpc", "rendering", "ci-runner"}
+	}
+	if contains(rgName, "security") {
+		return []string{"secrets", "certificates", "waf", "ids", "siem", "key-mgmt"}
+	}
+	if contains(rgName, "monitoring") {
+		return []string{"logs", "metrics", "alerts", "dashboards", "tracing", "apm"}
+	}
+	if contains(rgName, "identity") {
+		return []string{"auth", "mfa", "rbac", "federation", "sso", "directory"}
+	}
+	if contains(rgName, "containers") {
+		return []string{"orchestration", "registry", "serverless", "mesh", "build"}
+	}
+	if contains(rgName, "integration") {
+		return []string{"messaging", "api-mgmt", "workflow", "event-grid", "relay"}
+	}
+	if contains(rgName, "backup") {
+		return []string{"vm-backup", "sql-backup", "file-backup", "dr", "archive"}
+	}
+	if contains(rgName, "devtools") {
+		return []string{"build", "test", "deploy", "repo", "artifact"}
+	}
+	if contains(rgName, "shared-services") {
+		return []string{"domain", "dns", "ntp", "logging", "monitoring"}
+	}
+	if contains(rgName, "workloads") {
+		return []string{"erp", "crm", "hrms", "finance", "inventory"}
+	}
+	if contains(rgName, "frontend") {
+		return []string{"react", "vue", "angular", "static", "cdn"}
+	}
+	if contains(rgName, "api-gateways") {
+		return []string{"rest", "graphql", "grpc", "websocket", "webhook"}
+	}
+	if contains(rgName, "message-queues") {
+		return []string{"orders", "notifications", "events", "tasks", "emails"}
+	}
+	if contains(rgName, "caching") {
+		return []string{"session", "query", "object", "cdn", "rate-limit"}
+	}
+	if contains(rgName, "ai-ml") {
+		return []string{"training", "inference", "nlp", "vision", "forecasting"}
+	}
+	return []string{"general", "shared", "utility", "common"}
 }
