@@ -32,6 +32,7 @@ type VersionInfo struct {
 // ANSI color code for gray text (256-color palette)
 const grayColor = "\x1b[38;5;245m"
 const resetColor = "\x1b[0m"
+const loadingSymbol = "↻"
 
 // formatWithGraySuffix formats a name with a gray suffix in parentheses
 func formatWithGraySuffix(name, suffix string) string {
@@ -39,6 +40,40 @@ func formatWithGraySuffix(name, suffix string) string {
 		return name
 	}
 	return name + " " + grayColor + "(" + suffix + ")" + resetColor
+}
+
+// getLoadingText returns the current loading message if any panel is loading
+func (gui *Gui) getLoadingText() string {
+	gui.mu.RLock()
+	defer gui.mu.RUnlock()
+
+	// During refresh, show which panel triggered it
+	if gui.refreshTriggeredBy != "" {
+		switch gui.refreshTriggeredBy {
+		case "subscriptions":
+			return fmt.Sprintf("%s Refreshing subscriptions...", loadingSymbol)
+		case "resourcegroups":
+			return fmt.Sprintf("%s Refreshing resource groups...", loadingSymbol)
+		case "resources":
+			return fmt.Sprintf("%s Refreshing resources...", loadingSymbol)
+		case "main":
+			return fmt.Sprintf("%s Refreshing...", loadingSymbol)
+		}
+	}
+
+	if gui.loadingSubs {
+		return fmt.Sprintf("%s Loading subscriptions...", loadingSymbol)
+	}
+	if gui.loadingRGs {
+		return fmt.Sprintf("%s Loading resource groups...", loadingSymbol)
+	}
+	if gui.loadingRes {
+		return fmt.Sprintf("%s Loading resources...", loadingSymbol)
+	}
+	if gui.loadingUser {
+		return fmt.Sprintf("%s Authenticating...", loadingSymbol)
+	}
+	return ""
 }
 
 // Gui is the main GUI controller
@@ -93,6 +128,15 @@ type Gui struct {
 	versionCheckPending bool
 	showingVersion      bool
 	versionTimer        *time.Timer
+
+	// Loading state
+	loadingSubs bool // Loading subscriptions
+	loadingRGs  bool // Loading resource groups
+	loadingRes  bool // Loading resources
+	loadingUser bool // Loading user info
+
+	// Track which panel triggered refresh for better loading messages
+	refreshTriggeredBy string
 
 	mu sync.RWMutex
 }
@@ -1220,6 +1264,17 @@ func (gui *Gui) updateResSelectionFromFiltered() {
 }
 
 func (gui *Gui) loadUserInfo() {
+	// Set loading state
+	gui.mu.Lock()
+	gui.loadingUser = true
+	gui.mu.Unlock()
+
+	// Show loading in status bar immediately (blocking)
+	gui.g.Update(func(g *gocui.Gui) error {
+		gui.updateStatus()
+		return nil
+	})
+
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -1227,15 +1282,25 @@ func (gui *Gui) loadUserInfo() {
 		user, err := gui.azureClient.GetUserInfo(ctx)
 		if err != nil {
 			utils.Log("loadUserInfo: Error: %v", err)
-			return
+		} else {
+			gui.mu.Lock()
+			gui.currentUser = user
+			gui.mu.Unlock()
+
+			gui.g.UpdateAsync(func(g *gocui.Gui) error {
+				gui.refreshAuthPanel()
+				return nil
+			})
 		}
 
+		// Clear loading state
 		gui.mu.Lock()
-		gui.currentUser = user
+		gui.loadingUser = false
 		gui.mu.Unlock()
 
+		// Refresh status bar
 		gui.g.UpdateAsync(func(g *gocui.Gui) error {
-			gui.refreshAuthPanel()
+			gui.updateStatus()
 			return nil
 		})
 	}()
@@ -2016,8 +2081,30 @@ func (gui *Gui) refresh(g *gocui.Gui, v *gocui.View) error {
 	}
 	gui.mu.RUnlock()
 
+	// Determine what we're refreshing based on active panel
+	gui.mu.RLock()
+	activePanel := gui.activePanel
+	gui.mu.RUnlock()
+
+	// Set loading states based on what will be refreshed
+	gui.mu.Lock()
+	gui.loadingSubs = true
+	gui.loadingRGs = savedSubID != ""
+	gui.loadingRes = savedRGID != ""
+	// Store which panel triggered the refresh for better UX
+	gui.refreshTriggeredBy = activePanel
+	gui.mu.Unlock()
+
+	// Show loading indicator immediately
+	gui.g.Update(func(g *gocui.Gui) error {
+		gui.updateStatus()
+		return nil
+	})
+
 	// Reload all data in a single goroutine to avoid race conditions
 	go func() {
+		startTime := time.Now()
+
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
@@ -2188,6 +2275,14 @@ func (gui *Gui) refresh(g *gocui.Gui, v *gocui.View) error {
 			v.SetCursor(0, targetIndex-originY)
 		}
 
+		// Clear loading states and refresh trigger
+		gui.mu.Lock()
+		gui.loadingSubs = false
+		gui.loadingRGs = false
+		gui.loadingRes = false
+		gui.refreshTriggeredBy = ""
+		gui.mu.Unlock()
+
 		// Update all panels in a single UI update
 		gui.g.UpdateAsync(func(g *gocui.Gui) error {
 			// Refresh subscriptions panel
@@ -2216,6 +2311,7 @@ func (gui *Gui) refresh(g *gocui.Gui, v *gocui.View) error {
 
 			gui.refreshMainPanel()
 			gui.updateStatus()
+			utils.Log("refresh: Completed in %v", time.Since(startTime))
 			return nil
 		})
 	}()
@@ -2678,6 +2774,14 @@ func (gui *Gui) updateStatus() {
 	}
 
 	gui.statusView.Clear()
+
+	// Check if loading - takes precedence over other status messages
+	loadingText := gui.getLoadingText()
+	if loadingText != "" {
+		fmt.Fprint(gui.statusView, loadingText)
+		return
+	}
+
 	gui.mu.RLock()
 	activePanel := gui.activePanel
 	showingVersion := gui.showingVersion
@@ -2752,36 +2856,61 @@ func (gui *Gui) loadSubscriptions() {
 		return
 	}
 
+	// Set loading state
+	gui.mu.Lock()
+	gui.loadingSubs = true
+	gui.mu.Unlock()
+
+	// Show loading in status bar immediately (blocking)
+	gui.g.Update(func(g *gocui.Gui) error {
+		gui.updateStatus()
+		return nil
+	})
+
 	go func() {
+		startTime := time.Now()
+		utils.Log("loadSubscriptions: Starting load")
+
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
 		subs, err := subClient.ListSubscriptions(ctx)
 		if err != nil {
-			utils.Log("loadSubscriptions: Error: %v", err)
-			return
+			utils.Log("loadSubscriptions: Error after %v: %v", time.Since(startTime), err)
+		} else {
+			// Sort subscriptions alphabetically by name (case-insensitive)
+			sort.Slice(subs, func(i, j int) bool {
+				return strings.ToLower(subs[i].Name) < strings.ToLower(subs[j].Name)
+			})
+
+			gui.mu.Lock()
+			gui.subscriptions = subs
+			if len(subs) > 0 && gui.selectedSub == nil {
+				gui.selectedSub = subs[0]
+			}
+			gui.mu.Unlock()
+
+			// Update filtered list
+			gui.subList.SetItems(subs, func(sub *domain.Subscription) string {
+				return formatWithGraySuffix(sub.DisplayString(), sub.GetDisplaySuffix())
+			})
+
+			gui.g.UpdateAsync(func(g *gocui.Gui) error {
+				gui.refreshSubscriptionsPanel()
+				gui.refreshMainPanel()
+				return nil
+			})
+
+			utils.Log("loadSubscriptions: Completed in %v, loaded %d subscriptions", time.Since(startTime), len(subs))
 		}
 
-		// Sort subscriptions alphabetically by name (case-insensitive)
-		sort.Slice(subs, func(i, j int) bool {
-			return strings.ToLower(subs[i].Name) < strings.ToLower(subs[j].Name)
-		})
-
+		// Clear loading state
 		gui.mu.Lock()
-		gui.subscriptions = subs
-		if len(subs) > 0 && gui.selectedSub == nil {
-			gui.selectedSub = subs[0]
-		}
+		gui.loadingSubs = false
 		gui.mu.Unlock()
 
-		// Update filtered list
-		gui.subList.SetItems(subs, func(sub *domain.Subscription) string {
-			return formatWithGraySuffix(sub.DisplayString(), sub.GetDisplaySuffix())
-		})
-
+		// Refresh status bar
 		gui.g.UpdateAsync(func(g *gocui.Gui) error {
-			gui.refreshSubscriptionsPanel()
-			gui.refreshMainPanel()
 			gui.updateStatus()
 			return nil
 		})
@@ -2789,53 +2918,77 @@ func (gui *Gui) loadSubscriptions() {
 }
 
 func (gui *Gui) loadResourceGroups(subscriptionID string) {
+	// Set loading state
+	gui.mu.Lock()
+	gui.loadingRGs = true
+	gui.mu.Unlock()
+
+	// Show loading in status bar immediately (blocking)
+	gui.g.Update(func(g *gocui.Gui) error {
+		gui.updateStatus()
+		return nil
+	})
+
 	go func() {
+		startTime := time.Now()
+		utils.Log("loadResourceGroups: Starting load")
+
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
 		rgClient, err := gui.clientFactory.NewResourceGroupsClient(subscriptionID)
 		if err != nil {
-			utils.Log("loadResourceGroups: Error creating client: %v", err)
-			return
-		}
-
-		rgs, err := rgClient.ListResourceGroups(ctx)
-		if err != nil {
-			utils.Log("loadResourceGroups: Error listing RGs: %v", err)
-			return
-		}
-
-		// Sort resource groups alphabetically by name (case-insensitive)
-		sort.Slice(rgs, func(i, j int) bool {
-			return strings.ToLower(rgs[i].Name) < strings.ToLower(rgs[j].Name)
-		})
-
-		gui.mu.Lock()
-		gui.resourceGroups = rgs
-		gui.rgClient = rgClient
-		if len(rgs) > 0 {
-			gui.selectedRG = rgs[0]
+			utils.Log("loadResourceGroups: Error creating client after %v: %v", time.Since(startTime), err)
 		} else {
-			gui.selectedRG = nil
+			rgs, err := rgClient.ListResourceGroups(ctx)
+			if err != nil {
+				utils.Log("loadResourceGroups: Error listing RGs after %v: %v", time.Since(startTime), err)
+			} else {
+				// Sort resource groups alphabetically by name (case-insensitive)
+				sort.Slice(rgs, func(i, j int) bool {
+					return strings.ToLower(rgs[i].Name) < strings.ToLower(rgs[j].Name)
+				})
+
+				gui.mu.Lock()
+				gui.resourceGroups = rgs
+				gui.rgClient = rgClient
+				if len(rgs) > 0 {
+					gui.selectedRG = rgs[0]
+				} else {
+					gui.selectedRG = nil
+				}
+				// Clear resources when switching subscriptions
+				gui.resources = nil
+				gui.selectedRes = nil
+				gui.mu.Unlock()
+
+				// Update filtered list
+				gui.rgList.SetItems(rgs, func(rg *domain.ResourceGroup) string {
+					return formatWithGraySuffix(rg.DisplayString(), rg.GetDisplaySuffix())
+				})
+				// Clear resource list when switching subscriptions
+				gui.resList.SetItems([]*domain.Resource{}, func(res *domain.Resource) string {
+					return ""
+				})
+
+				gui.g.UpdateAsync(func(g *gocui.Gui) error {
+					gui.refreshResourceGroupsPanel()
+					gui.refreshResourcesPanel()
+					gui.refreshMainPanel()
+					return nil
+				})
+
+				utils.Log("loadResourceGroups: Completed in %v, loaded %d resource groups", time.Since(startTime), len(rgs))
+			}
 		}
-		// Clear resources when switching subscriptions
-		gui.resources = nil
-		gui.selectedRes = nil
+
+		// Clear loading state
+		gui.mu.Lock()
+		gui.loadingRGs = false
 		gui.mu.Unlock()
 
-		// Update filtered list
-		gui.rgList.SetItems(rgs, func(rg *domain.ResourceGroup) string {
-			return formatWithGraySuffix(rg.DisplayString(), rg.GetDisplaySuffix())
-		})
-		// Clear resource list when switching subscriptions
-		gui.resList.SetItems([]*domain.Resource{}, func(res *domain.Resource) string {
-			return ""
-		})
-
+		// Refresh status bar
 		gui.g.UpdateAsync(func(g *gocui.Gui) error {
-			gui.refreshResourceGroupsPanel()
-			gui.refreshResourcesPanel()
-			gui.refreshMainPanel()
 			gui.updateStatus()
 			return nil
 		})
@@ -2843,45 +2996,69 @@ func (gui *Gui) loadResourceGroups(subscriptionID string) {
 }
 
 func (gui *Gui) loadResources(subscriptionID string, resourceGroupName string) {
+	// Set loading state
+	gui.mu.Lock()
+	gui.loadingRes = true
+	gui.mu.Unlock()
+
+	// Show loading in status bar immediately (blocking)
+	gui.g.Update(func(g *gocui.Gui) error {
+		gui.updateStatus()
+		return nil
+	})
+
 	go func() {
+		startTime := time.Now()
+		utils.Log("loadResources: Starting load for resource group '%s'", resourceGroupName)
+
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
 		resClient, err := gui.clientFactory.NewResourcesClient(subscriptionID)
 		if err != nil {
-			utils.Log("loadResources: Error creating client: %v", err)
-			return
-		}
-
-		resources, err := resClient.ListResourcesByResourceGroup(ctx, resourceGroupName)
-		if err != nil {
-			utils.Log("loadResources: Error listing resources: %v", err)
-			return
-		}
-
-		// Sort resources alphabetically by name (case-insensitive)
-		sort.Slice(resources, func(i, j int) bool {
-			return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
-		})
-
-		gui.mu.Lock()
-		gui.resources = resources
-		gui.resClient = resClient
-		if len(resources) > 0 {
-			gui.selectedRes = resources[0]
+			utils.Log("loadResources: Error creating client after %v: %v", time.Since(startTime), err)
 		} else {
-			gui.selectedRes = nil
+			resources, err := resClient.ListResourcesByResourceGroup(ctx, resourceGroupName)
+			if err != nil {
+				utils.Log("loadResources: Error listing resources after %v: %v", time.Since(startTime), err)
+			} else {
+				// Sort resources alphabetically by name (case-insensitive)
+				sort.Slice(resources, func(i, j int) bool {
+					return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
+				})
+
+				gui.mu.Lock()
+				gui.resources = resources
+				gui.resClient = resClient
+				if len(resources) > 0 {
+					gui.selectedRes = resources[0]
+				} else {
+					gui.selectedRes = nil
+				}
+				gui.mu.Unlock()
+
+				// Update filtered list
+				gui.resList.SetItems(resources, func(res *domain.Resource) string {
+					return formatWithGraySuffix(res.DisplayString(), res.GetDisplaySuffix())
+				})
+
+				gui.g.UpdateAsync(func(g *gocui.Gui) error {
+					gui.refreshResourcesPanel()
+					gui.refreshMainPanel()
+					return nil
+				})
+
+				utils.Log("loadResources: Completed in %v, loaded %d resources", time.Since(startTime), len(resources))
+			}
 		}
+
+		// Clear loading state
+		gui.mu.Lock()
+		gui.loadingRes = false
 		gui.mu.Unlock()
 
-		// Update filtered list
-		gui.resList.SetItems(resources, func(res *domain.Resource) string {
-			return formatWithGraySuffix(res.DisplayString(), res.GetDisplaySuffix())
-		})
-
+		// Refresh status bar
 		gui.g.UpdateAsync(func(g *gocui.Gui) error {
-			gui.refreshResourcesPanel()
-			gui.refreshMainPanel()
 			gui.updateStatus()
 			return nil
 		})
@@ -2898,6 +3075,17 @@ func (gui *Gui) loadSubscriptionsWithSelection(savedSubID string) {
 		return
 	}
 
+	// Set loading state
+	gui.mu.Lock()
+	gui.loadingSubs = true
+	gui.mu.Unlock()
+
+	// Show loading in status bar immediately (blocking)
+	gui.g.Update(func(g *gocui.Gui) error {
+		gui.updateStatus()
+		return nil
+	})
+
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -2905,46 +3093,55 @@ func (gui *Gui) loadSubscriptionsWithSelection(savedSubID string) {
 		subs, err := subClient.ListSubscriptions(ctx)
 		if err != nil {
 			utils.Log("loadSubscriptionsWithSelection: Error: %v", err)
-			return
+		} else {
+			// Sort subscriptions alphabetically by name (case-insensitive)
+			sort.Slice(subs, func(i, j int) bool {
+				return strings.ToLower(subs[i].Name) < strings.ToLower(subs[j].Name)
+			})
+
+			gui.mu.Lock()
+			gui.subscriptions = subs
+			// Only set default selection if no saved selection exists
+			if len(subs) > 0 && gui.selectedSub == nil && savedSubID == "" {
+				gui.selectedSub = subs[0]
+			}
+			gui.mu.Unlock()
+
+			// Update filtered list
+			gui.subList.SetItems(subs, func(sub *domain.Subscription) string {
+				return formatWithGraySuffix(sub.DisplayString(), sub.GetDisplaySuffix())
+			})
+
+			// Find the index of the saved subscription in the filtered list
+			var targetIndex int = -1
+			if savedSubID != "" {
+				if idx, ok := gui.subList.FindIndex(func(sub *domain.Subscription) bool {
+					return sub.ID == savedSubID
+				}); ok {
+					targetIndex = idx
+				}
+			}
+
+			gui.g.UpdateAsync(func(g *gocui.Gui) error {
+				gui.refreshSubscriptionsPanel()
+				// Restore cursor position if we found the saved subscription
+				if targetIndex >= 0 && gui.subscriptionsView != nil {
+					gui.subscriptionsView.SetCursor(0, targetIndex)
+					// Update selection to match cursor
+					gui.updateSubscriptionSelection(gui.subscriptionsView)
+				}
+				gui.refreshMainPanel()
+				return nil
+			})
 		}
 
-		// Sort subscriptions alphabetically by name (case-insensitive)
-		sort.Slice(subs, func(i, j int) bool {
-			return strings.ToLower(subs[i].Name) < strings.ToLower(subs[j].Name)
-		})
-
+		// Clear loading state
 		gui.mu.Lock()
-		gui.subscriptions = subs
-		// Only set default selection if no saved selection exists
-		if len(subs) > 0 && gui.selectedSub == nil && savedSubID == "" {
-			gui.selectedSub = subs[0]
-		}
+		gui.loadingSubs = false
 		gui.mu.Unlock()
 
-		// Update filtered list
-		gui.subList.SetItems(subs, func(sub *domain.Subscription) string {
-			return formatWithGraySuffix(sub.DisplayString(), sub.GetDisplaySuffix())
-		})
-
-		// Find the index of the saved subscription in the filtered list
-		var targetIndex int = -1
-		if savedSubID != "" {
-			if idx, ok := gui.subList.FindIndex(func(sub *domain.Subscription) bool {
-				return sub.ID == savedSubID
-			}); ok {
-				targetIndex = idx
-			}
-		}
-
+		// Refresh status bar
 		gui.g.UpdateAsync(func(g *gocui.Gui) error {
-			gui.refreshSubscriptionsPanel()
-			// Restore cursor position if we found the saved subscription
-			if targetIndex >= 0 && gui.subscriptionsView != nil {
-				gui.subscriptionsView.SetCursor(0, targetIndex)
-				// Update selection to match cursor
-				gui.updateSubscriptionSelection(gui.subscriptionsView)
-			}
-			gui.refreshMainPanel()
 			gui.updateStatus()
 			return nil
 		})
@@ -2953,6 +3150,17 @@ func (gui *Gui) loadSubscriptionsWithSelection(savedSubID string) {
 
 // loadResourceGroupsWithSelection loads resource groups and restores cursor position
 func (gui *Gui) loadResourceGroupsWithSelection(subscriptionID, savedRGID string) {
+	// Set loading state
+	gui.mu.Lock()
+	gui.loadingRGs = true
+	gui.mu.Unlock()
+
+	// Show loading in status bar immediately (blocking)
+	gui.g.Update(func(g *gocui.Gui) error {
+		gui.updateStatus()
+		return nil
+	})
+
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -2960,54 +3168,62 @@ func (gui *Gui) loadResourceGroupsWithSelection(subscriptionID, savedRGID string
 		rgClient, err := gui.clientFactory.NewResourceGroupsClient(subscriptionID)
 		if err != nil {
 			utils.Log("loadResourceGroupsWithSelection: Error creating client: %v", err)
-			return
+		} else {
+			rgs, err := rgClient.ListResourceGroups(ctx)
+			if err != nil {
+				utils.Log("loadResourceGroupsWithSelection: Error listing RGs: %v", err)
+			} else {
+				// Sort resource groups alphabetically by name (case-insensitive)
+				sort.Slice(rgs, func(i, j int) bool {
+					return strings.ToLower(rgs[i].Name) < strings.ToLower(rgs[j].Name)
+				})
+
+				gui.mu.Lock()
+				gui.resourceGroups = rgs
+				gui.rgClient = rgClient
+				// Only set default selection if no saved selection exists
+				if len(rgs) > 0 && savedRGID == "" {
+					gui.selectedRG = rgs[0]
+				}
+				gui.mu.Unlock()
+
+				// Update filtered list
+				gui.rgList.SetItems(rgs, func(rg *domain.ResourceGroup) string {
+					return formatWithGraySuffix(rg.DisplayString(), rg.GetDisplaySuffix())
+				})
+
+				// Find the index of the saved resource group in the filtered list
+				var targetIndex int = -1
+				if savedRGID != "" {
+					if idx, ok := gui.rgList.FindIndex(func(rg *domain.ResourceGroup) bool {
+						return rg.ID == savedRGID
+					}); ok {
+						targetIndex = idx
+					}
+				}
+
+				gui.g.UpdateAsync(func(g *gocui.Gui) error {
+					gui.refreshResourceGroupsPanel()
+					// Restore cursor position if we found the saved resource group
+					if targetIndex >= 0 && gui.resourceGroupsView != nil {
+						gui.resourceGroupsView.SetCursor(0, targetIndex)
+						// Update selection to match cursor
+						gui.updateRGSelection(gui.resourceGroupsView)
+					}
+					gui.refreshResourcesPanel()
+					gui.refreshMainPanel()
+					return nil
+				})
+			}
 		}
 
-		rgs, err := rgClient.ListResourceGroups(ctx)
-		if err != nil {
-			utils.Log("loadResourceGroupsWithSelection: Error listing RGs: %v", err)
-			return
-		}
-
-		// Sort resource groups alphabetically by name (case-insensitive)
-		sort.Slice(rgs, func(i, j int) bool {
-			return strings.ToLower(rgs[i].Name) < strings.ToLower(rgs[j].Name)
-		})
-
+		// Clear loading state
 		gui.mu.Lock()
-		gui.resourceGroups = rgs
-		gui.rgClient = rgClient
-		// Only set default selection if no saved selection exists
-		if len(rgs) > 0 && savedRGID == "" {
-			gui.selectedRG = rgs[0]
-		}
+		gui.loadingRGs = false
 		gui.mu.Unlock()
 
-		// Update filtered list
-		gui.rgList.SetItems(rgs, func(rg *domain.ResourceGroup) string {
-			return formatWithGraySuffix(rg.DisplayString(), rg.GetDisplaySuffix())
-		})
-
-		// Find the index of the saved resource group in the filtered list
-		var targetIndex int = -1
-		if savedRGID != "" {
-			if idx, ok := gui.rgList.FindIndex(func(rg *domain.ResourceGroup) bool {
-				return rg.ID == savedRGID
-			}); ok {
-				targetIndex = idx
-			}
-		}
-
+		// Refresh status bar
 		gui.g.UpdateAsync(func(g *gocui.Gui) error {
-			gui.refreshResourceGroupsPanel()
-			// Restore cursor position if we found the saved resource group
-			if targetIndex >= 0 && gui.resourceGroupsView != nil {
-				gui.resourceGroupsView.SetCursor(0, targetIndex)
-				// Update selection to match cursor
-				gui.updateRGSelection(gui.resourceGroupsView)
-			}
-			gui.refreshResourcesPanel()
-			gui.refreshMainPanel()
 			gui.updateStatus()
 			return nil
 		})
@@ -3016,6 +3232,17 @@ func (gui *Gui) loadResourceGroupsWithSelection(subscriptionID, savedRGID string
 
 // loadResourcesWithSelection loads resources and restores cursor position
 func (gui *Gui) loadResourcesWithSelection(subscriptionID, resourceGroupName, savedResID string) {
+	// Set loading state
+	gui.mu.Lock()
+	gui.loadingRes = true
+	gui.mu.Unlock()
+
+	// Show loading in status bar immediately (blocking)
+	gui.g.Update(func(g *gocui.Gui) error {
+		gui.updateStatus()
+		return nil
+	})
+
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -3023,53 +3250,61 @@ func (gui *Gui) loadResourcesWithSelection(subscriptionID, resourceGroupName, sa
 		resClient, err := gui.clientFactory.NewResourcesClient(subscriptionID)
 		if err != nil {
 			utils.Log("loadResourcesWithSelection: Error creating client: %v", err)
-			return
+		} else {
+			resources, err := resClient.ListResourcesByResourceGroup(ctx, resourceGroupName)
+			if err != nil {
+				utils.Log("loadResourcesWithSelection: Error listing resources: %v", err)
+			} else {
+				// Sort resources alphabetically by name (case-insensitive)
+				sort.Slice(resources, func(i, j int) bool {
+					return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
+				})
+
+				gui.mu.Lock()
+				gui.resources = resources
+				gui.resClient = resClient
+				// Only set default selection if no saved selection exists
+				if len(resources) > 0 && savedResID == "" {
+					gui.selectedRes = resources[0]
+				}
+				gui.mu.Unlock()
+
+				// Update filtered list
+				gui.resList.SetItems(resources, func(res *domain.Resource) string {
+					return formatWithGraySuffix(res.DisplayString(), res.GetDisplaySuffix())
+				})
+
+				// Find the index of the saved resource in the filtered list
+				var targetIndex int = -1
+				if savedResID != "" {
+					if idx, ok := gui.resList.FindIndex(func(res *domain.Resource) bool {
+						return res.ID == savedResID
+					}); ok {
+						targetIndex = idx
+					}
+				}
+
+				gui.g.UpdateAsync(func(g *gocui.Gui) error {
+					gui.refreshResourcesPanel()
+					// Restore cursor position if we found the saved resource
+					if targetIndex >= 0 && gui.resourcesView != nil {
+						gui.resourcesView.SetCursor(0, targetIndex)
+						// Update selection to match cursor
+						gui.updateResSelection(gui.resourcesView)
+					}
+					gui.refreshMainPanel()
+					return nil
+				})
+			}
 		}
 
-		resources, err := resClient.ListResourcesByResourceGroup(ctx, resourceGroupName)
-		if err != nil {
-			utils.Log("loadResourcesWithSelection: Error listing resources: %v", err)
-			return
-		}
-
-		// Sort resources alphabetically by name (case-insensitive)
-		sort.Slice(resources, func(i, j int) bool {
-			return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
-		})
-
+		// Clear loading state
 		gui.mu.Lock()
-		gui.resources = resources
-		gui.resClient = resClient
-		// Only set default selection if no saved selection exists
-		if len(resources) > 0 && savedResID == "" {
-			gui.selectedRes = resources[0]
-		}
+		gui.loadingRes = false
 		gui.mu.Unlock()
 
-		// Update filtered list
-		gui.resList.SetItems(resources, func(res *domain.Resource) string {
-			return formatWithGraySuffix(res.DisplayString(), res.GetDisplaySuffix())
-		})
-
-		// Find the index of the saved resource in the filtered list
-		var targetIndex int = -1
-		if savedResID != "" {
-			if idx, ok := gui.resList.FindIndex(func(res *domain.Resource) bool {
-				return res.ID == savedResID
-			}); ok {
-				targetIndex = idx
-			}
-		}
-
+		// Refresh status bar
 		gui.g.UpdateAsync(func(g *gocui.Gui) error {
-			gui.refreshResourcesPanel()
-			// Restore cursor position if we found the saved resource
-			if targetIndex >= 0 && gui.resourcesView != nil {
-				gui.resourcesView.SetCursor(0, targetIndex)
-				// Update selection to match cursor
-				gui.updateResSelection(gui.resourcesView)
-			}
-			gui.refreshMainPanel()
 			gui.updateStatus()
 			return nil
 		})
@@ -3078,6 +3313,17 @@ func (gui *Gui) loadResourcesWithSelection(subscriptionID, resourceGroupName, sa
 
 // loadResourceDetails fetches full resource details with provider-specific API version
 func (gui *Gui) loadResourceDetails(originalRes *domain.Resource) {
+	// Set loading state (using loadingRes since this is loading resource details)
+	gui.mu.Lock()
+	gui.loadingRes = true
+	gui.mu.Unlock()
+
+	// Show loading in status bar immediately (blocking)
+	gui.g.Update(func(g *gocui.Gui) error {
+		gui.updateStatus()
+		return nil
+	})
+
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -3088,28 +3334,37 @@ func (gui *Gui) loadResourceDetails(originalRes *domain.Resource) {
 
 		if resClient == nil {
 			utils.Log("loadResourceDetails: No resources client available")
-			return
+		} else {
+			// Fetch full resource details with provider-specific properties
+			resource, err := resClient.GetResource(ctx, originalRes.ID, originalRes.Type)
+			if err != nil {
+				utils.Log("loadResourceDetails: Error loading resource, type=%s, error=%v", originalRes.Type, err)
+			} else {
+				// Preserve createdTime and changedTime from the original list data
+				// (these aren't returned by GetByID but were in the list view)
+				resource.CreatedTime = originalRes.CreatedTime
+				resource.ChangedTime = originalRes.ChangedTime
+
+				gui.mu.Lock()
+				gui.selectedRes = resource
+				gui.mu.Unlock()
+
+				gui.g.UpdateAsync(func(g *gocui.Gui) error {
+					gui.refreshMainPanel()
+					gui.updatePanelTitles() // Restore focus indicator
+					return nil
+				})
+			}
 		}
 
-		// Fetch full resource details with provider-specific properties
-		resource, err := resClient.GetResource(ctx, originalRes.ID, originalRes.Type)
-		if err != nil {
-			utils.Log("loadResourceDetails: Error loading resource, type=%s, error=%v", originalRes.Type, err)
-			return
-		}
-
-		// Preserve createdTime and changedTime from the original list data
-		// (these aren't returned by GetByID but were in the list view)
-		resource.CreatedTime = originalRes.CreatedTime
-		resource.ChangedTime = originalRes.ChangedTime
-
+		// Clear loading state
 		gui.mu.Lock()
-		gui.selectedRes = resource
+		gui.loadingRes = false
 		gui.mu.Unlock()
 
+		// Refresh status bar
 		gui.g.UpdateAsync(func(g *gocui.Gui) error {
-			gui.refreshMainPanel()
-			gui.updatePanelTitles() // Restore focus indicator
+			gui.updateStatus()
 			return nil
 		})
 	}()
