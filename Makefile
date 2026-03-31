@@ -39,3 +39,13 @@ check: fmt lint test
 .PHONY: fmt
 fmt:
 	gofmt -w .
+
+.PHONY: update-api-versions
+update-api-versions:
+	@echo "Updating API versions from bicep-types-az..."
+	@which curl >/dev/null 2>&1 || (echo "Error: curl is required" && exit 1)
+	@curl -sL https://raw.githubusercontent.com/Azure/bicep-types-az/main/generated/index.json -o /tmp/bicep-index.json
+	@go run tools/update-api-versions/main.go /tmp/bicep-index.json
+	@rm -f /tmp/bicep-index.json
+	@echo "API versions updated successfully!"
+	@echo "Review changes and commit: pkg/azure/api_versions_curated.json"
