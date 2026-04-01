@@ -9,7 +9,7 @@
 
 A TUI application for viewing Azure resources, inspired by [lazydocker](https://github.com/jesseduffield/lazydocker). Browse Azure subscriptions, resource groups, and resources with an interactive terminal interface.
 
-> **About This Project**: Built through AI pair programming with [OpenCode](https://opencode.ai). See [AGENTS.md](AGENTS.md) for development guidelines and [Security](#Security) for security information. It is provided as-is without warranties ([MIT License](./LICENSE)). 
+> **About This Project**: Built through AI pair programming with [OpenCode](https://opencode.ai). See [AGENTS.md](AGENTS.md) for development guidelines and [Security](#Security) for security information. It is provided as-is without warranties ([MIT License](./LICENSE)).
 
 ![demo](./demo.png)
 
@@ -234,7 +234,7 @@ Linux clipboard requires `xclip` or `xsel` (X11) or `wl-copy` (Wayland). macOS a
 - **Phase 1 (MVP)**: ✅ Complete - Auth & subscriptions working
 - **Phase 2**: ✅ Complete - Resource groups with stacked layout
 - **Phase 3**: ✅ Complete - Resources browser with 3-level hierarchy
-- **Phase 4**: 📝 Planned - Polish & advanced features
+- **Phase 4**: 📝 In progress - Polish, performance improvements & advanced features
 
 See [PLAN.md](./PLAN.md) for the full implementation roadmap.
 
@@ -259,6 +259,8 @@ If you have any findings, please [report a vulnerability](https://github.com/mat
 ## Contributing
 
 Found a bug or have a feature idea? We welcome your feedback!
+
+This project is still in an early phase so please add an issue before starting a big pull request.
 
 - **Bug reports**: [Open an issue](../../issues/new?template=bug_report.md) with details about the problem, your environment, and steps to reproduce
 - **Feature requests**: [Open an issue](../../issues/new?template=feature_request.md) describing the feature and your use case
