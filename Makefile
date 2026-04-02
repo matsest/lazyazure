@@ -16,7 +16,7 @@ build:
 
 .PHONY: build-ci
 build-ci:
-	go build -ldflags "$(LDFLAGS)" -o lazyazure . -v
+	go build -v -ldflags "$(LDFLAGS)" -o lazyazure .
 
 .PHONY: test
 test:
