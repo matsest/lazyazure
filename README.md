@@ -21,7 +21,7 @@ A TUI application for viewing Azure resources, inspired by [lazydocker](https://
   - Summary view with color-coded keys and formatted nested properties
   - JSON view with syntax highlighting
   - Scrollable content for long resource details
-- **Intuitive Navigation**: 
+- **Intuitive Navigation**:
   - Tab/Shift+Tab to cycle between panels
   - Enter to drill down hierarchy
   - Visual focus indicators (green border on active panel)
@@ -31,7 +31,6 @@ A TUI application for viewing Azure resources, inspired by [lazydocker](https://
 - **Copy portal link**: Copy link to subscription, resource group or resource to clipboard
 - **Smart Resource Loading**: Fetches full resource details with provider-specific API versions
 - **Intelligent Caching**: Background preloading and multi-tier caching for instant navigation between previously viewed resources
-- **Real-time Updates**: Refresh data without restarting the application
 
 See [PLAN.md](./PLAN.md) for implementation details and roadmap.
 
@@ -73,29 +72,6 @@ make build
 
 **Note:** Using `make build` injects version information (git commit) into the binary. Plain `go build .` works but shows `dev (unknown)` for version.
 
-### Check Version
-
-```bash
-lazyazure --version
-# or
-lazyazure version
-# or
-lazyazure -v
-```
-
-### Check for Updates
-
-```bash
-lazyazure --check-update
-```
-
-Checks the latest release on GitHub and compares with your current version. Exit codes:
-- `0`: Up to date or development build
-- `1`: Update available
-- `2`: Error checking for updates
-
-Note: Development builds (e.g., `dev`, `-dirty`, or commits ahead of a tag) skip version comparison but still show the latest available version.
-
 ## Usage
 
 ### Quick Start
@@ -117,6 +93,25 @@ See other methods under [authentication](#Authentication).
    ```bash
    lazyazure
    ```
+
+### Check Version
+
+```bash
+lazyazure --version
+```
+
+### Check for Updates
+
+```bash
+lazyazure --check-update
+```
+
+Checks the latest release on GitHub and compares with your current version. Exit codes:
+- `0`: Up to date or development build
+- `1`: Update available
+- `2`: Error checking for updates
+
+Note: Development builds (e.g., `dev`, `-dirty`, or commits ahead of a tag) skip version comparison but still show the latest available version.
 
 ### Controls
 
@@ -202,7 +197,6 @@ Demo mode provides:
 - Resource groups per subscription with various purposes (networking, databases, web-apps, etc.)
 - 15 different Azure resource types (VMs, Storage Accounts, Key Vaults, SQL Databases, Load Balancers, etc.)
 - Realistic nested properties and tags
-- Simulated API response times for authentic feel
 
 All data in demo mode is completely fake and safe to display publicly.
 
@@ -223,7 +217,9 @@ cat ~/.lazyazure/debug.log
 
 ## Cross-Platform Support
 
-- **Linux**: Full support
+The project aims to have full cross-platform support.
+
+- **Linux**: Full support (main development platform)
 - **macOS**: Full support
 - **Windows**: Good support (recommend Windows Terminal; classic CMD/PowerShell not recommended)
 
@@ -252,7 +248,7 @@ You can see all dependencies in [dependency graph](https://github.com/matsest/la
 
 ## Security
 
-LazyAzure uses Microsoft's official [Azure SDK for Go](https://github.com/Azure/azure-sdk-for-go) with DefaultAzureCredential for authentication, supporting Azure CLI, Azure PowerShell, Managed Identity, environment variables, and other official Azure authentication methods. The application does not store credentials or sensitive data to disk; all tokens are handled in-memory only during runtime. No telemetry or logs is collected. Communication with Azure APIs uses HTTPS/TLS exclusively. [Debug logging](#debug-logging) is disabled by default and can be enabled via the `LAZYAZURE_DEBUG`` environment variable, which optionally logs to a local file in a users home directory. The repository is open source ([MIT License](./LICENSE)) and uses [Dependabot](./.github/dependabot.yml) for automated dependency/security updates and GitHub's [CodeQL](https://docs.github.com/en/code-security/concepts/code-scanning/codeql/about-code-scanning-with-codeql) for security analysis.
+LazyAzure uses Microsoft's official [Azure SDK for Go](https://github.com/Azure/azure-sdk-for-go) with DefaultAzureCredential for authentication, supporting Azure CLI, Azure PowerShell, Managed Identity, environment variables, and other official Azure authentication methods. The application does not store credentials or sensitive data to disk; all tokens are handled in-memory only during runtime. No telemetry or logs is collected. Communication with Azure APIs uses HTTPS/TLS exclusively. [Debug logging](#debug-logging) is disabled by default and can be enabled via the `LAZYAZURE_DEBUG` environment variable, which optionally logs to a _local_ file in a user home directory. The repository is open source ([MIT License](./LICENSE)) and uses [Dependabot](./.github/dependabot.yml) for automated dependency/security updates and GitHub's [CodeQL](https://docs.github.com/en/code-security/concepts/code-scanning/codeql/about-code-scanning-with-codeql) for security analysis.
 
 If you have any findings, please [report a vulnerability](https://github.com/matsest/lazyazure/security/advisories/new).
 
