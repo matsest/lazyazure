@@ -6,6 +6,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
 	"github.com/matsest/lazyazure/pkg/domain"
+	"github.com/matsest/lazyazure/pkg/utils"
 )
 
 // SubscriptionsClient wraps the Azure subscriptions client
@@ -27,6 +28,8 @@ func NewSubscriptionsClient(client *Client) (*SubscriptionsClient, error) {
 
 // ListSubscriptions retrieves all subscriptions accessible to the user
 func (c *SubscriptionsClient) ListSubscriptions(ctx context.Context) ([]*domain.Subscription, error) {
+	record := utils.StartAPITimer("ListSubscriptions")
+
 	pager := c.client.NewListPager(nil)
 
 	var subscriptions []*domain.Subscription
@@ -34,6 +37,7 @@ func (c *SubscriptionsClient) ListSubscriptions(ctx context.Context) ([]*domain.
 	for pager.More() {
 		page, err := pager.NextPage(ctx)
 		if err != nil {
+			record(err)
 			return nil, fmt.Errorf("failed to list subscriptions: %w", err)
 		}
 
@@ -49,11 +53,17 @@ func (c *SubscriptionsClient) ListSubscriptions(ctx context.Context) ([]*domain.
 		}
 	}
 
+	record(nil)
+	if utils.IsDebugEnabled() {
+		utils.Log("[API] ListSubscriptions loaded %d subscriptions", len(subscriptions))
+	}
 	return subscriptions, nil
 }
 
 // GetSubscription retrieves a specific subscription by ID
 func (c *SubscriptionsClient) GetSubscription(ctx context.Context, subscriptionID string) (*domain.Subscription, error) {
+	defer utils.StartAPITimer("GetSubscription")(nil)
+
 	resp, err := c.client.Get(ctx, subscriptionID, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get subscription %s: %w", subscriptionID, err)

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/matsest/lazyazure/pkg/domain"
+	"github.com/matsest/lazyazure/pkg/utils"
 )
 
 func TestNewPreloadCache(t *testing.T) {
@@ -968,5 +969,154 @@ func TestParseCacheSizeLevel(t *testing.T) {
 		if result != tc.expected {
 			t.Errorf("parseCacheSizeLevel(%q) = %v, expected %v", tc.input, result, tc.expected)
 		}
+	}
+}
+
+// Metrics integration tests
+
+func TestPreloadCache_MetricsCacheHit(t *testing.T) {
+	// Reset metrics before test
+	utils.GetMetrics().Reset()
+
+	cache := NewPreloadCacheWithConfig(CacheConfig{
+		RGCacheSize:      100,
+		ResCacheSize:     500,
+		FullResCacheSize: 500,
+	})
+	subID := "test-subscription"
+
+	_, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Set data in cache
+	cache.SetRGs(subID, []*domain.ResourceGroup{{Name: "rg1"}}, cancel)
+
+	// Get data - should be a cache hit
+	_, ok := cache.GetRGs(subID)
+	if !ok {
+		t.Error("Expected to find cached RGs")
+	}
+
+	// Check metrics
+	stats := utils.GetMetrics().GetStats()
+	if stats.CacheHits != 1 {
+		t.Errorf("Expected 1 cache hit, got %d", stats.CacheHits)
+	}
+}
+
+func TestPreloadCache_MetricsCacheMiss(t *testing.T) {
+	// Reset metrics before test
+	utils.GetMetrics().Reset()
+
+	cache := NewPreloadCacheWithConfig(CacheConfig{
+		RGCacheSize:      100,
+		ResCacheSize:     500,
+		FullResCacheSize: 500,
+	})
+
+	// Get non-existent data - should be a cache miss
+	_, ok := cache.GetRGs("non-existent-sub")
+	if ok {
+		t.Error("Should not find non-existent RGs")
+	}
+
+	// Check metrics
+	stats := utils.GetMetrics().GetStats()
+	if stats.CacheMisses != 1 {
+		t.Errorf("Expected 1 cache miss, got %d", stats.CacheMisses)
+	}
+}
+
+func TestPreloadCache_MetricsCacheSizeTracking(t *testing.T) {
+	// Reset metrics before test
+	utils.GetMetrics().Reset()
+
+	cache := NewPreloadCacheWithConfig(CacheConfig{
+		RGCacheSize:      100,
+		ResCacheSize:     500,
+		FullResCacheSize: 500,
+	})
+
+	_, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Add items
+	cache.SetRGs("sub1", []*domain.ResourceGroup{{Name: "rg1"}}, cancel)
+	cache.SetRGs("sub2", []*domain.ResourceGroup{{Name: "rg2"}}, cancel)
+	cache.SetRes("sub1", "rg1", []*domain.Resource{{Name: "res1"}}, cancel)
+
+	// Check metrics reflect current size
+	stats := utils.GetMetrics().GetStats()
+	if stats.CurrentRGSize != 2 {
+		t.Errorf("Expected current RG size 2, got %d", stats.CurrentRGSize)
+	}
+	if stats.CurrentResSize != 1 {
+		t.Errorf("Expected current Res size 1, got %d", stats.CurrentResSize)
+	}
+	if stats.MaxRGSize != 2 {
+		t.Errorf("Expected max RG size 2, got %d", stats.MaxRGSize)
+	}
+}
+
+func TestPreloadCache_MetricsEviction(t *testing.T) {
+	// Reset metrics before test
+	utils.GetMetrics().Reset()
+
+	cache := NewPreloadCacheWithConfig(CacheConfig{
+		RGCacheSize:      4,
+		ResCacheSize:     500,
+		FullResCacheSize: 500,
+	})
+
+	_, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Add 4 entries
+	for i := 0; i < 4; i++ {
+		subID := string(rune('a' + i))
+		cache.SetRGs(subID, []*domain.ResourceGroup{{Name: "rg"}}, cancel)
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Add one more - should trigger eviction of 2 items
+	cache.SetRGs("e", []*domain.ResourceGroup{{Name: "rg"}}, cancel)
+
+	// Check metrics
+	stats := utils.GetMetrics().GetStats()
+	if stats.Evictions != 2 {
+		t.Errorf("Expected 2 evictions, got %d", stats.Evictions)
+	}
+}
+
+func TestPreloadCache_MetricsOnInvalidate(t *testing.T) {
+	// Reset metrics before test
+	utils.GetMetrics().Reset()
+
+	cache := NewPreloadCacheWithConfig(CacheConfig{
+		RGCacheSize:      100,
+		ResCacheSize:     500,
+		FullResCacheSize: 500,
+	})
+
+	_, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Add data
+	cache.SetRGs("sub1", []*domain.ResourceGroup{{Name: "rg1"}}, cancel)
+	cache.SetRGs("sub2", []*domain.ResourceGroup{{Name: "rg2"}}, cancel)
+
+	// Verify metrics show items
+	stats := utils.GetMetrics().GetStats()
+	if stats.CurrentRGSize != 2 {
+		t.Errorf("Expected RG size 2 before invalidate, got %d", stats.CurrentRGSize)
+	}
+
+	// Invalidate all
+	cache.InvalidateSubs()
+
+	// Check metrics are updated
+	stats = utils.GetMetrics().GetStats()
+	if stats.CurrentRGSize != 0 {
+		t.Errorf("Expected RG size 0 after invalidate, got %d", stats.CurrentRGSize)
 	}
 }

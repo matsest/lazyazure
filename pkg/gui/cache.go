@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/matsest/lazyazure/pkg/domain"
+	"github.com/matsest/lazyazure/pkg/utils"
 )
 
 // Cache sizing constants - base values
@@ -157,13 +158,16 @@ func (c *PreloadCache) GetRGs(subID string) ([]*domain.ResourceGroup, bool) {
 
 	cached, ok := c.rgs[subID]
 	if !ok {
+		utils.GetMetrics().RecordCacheMiss()
 		return nil, false
 	}
 
 	if c.isExpired(cached.timestamp, rgCacheTTL) {
+		utils.GetMetrics().RecordCacheMiss()
 		return nil, false
 	}
 
+	utils.GetMetrics().RecordCacheHit()
 	return cached.groups, true
 }
 
@@ -180,7 +184,9 @@ func (c *PreloadCache) SetRGs(subID string, groups []*domain.ResourceGroup, canc
 
 	// Check if we need to evict
 	if len(c.rgs) >= c.rgLimit {
-		c.evictOldestRGs(c.rgLimit / 2)
+		evicted := c.rgLimit / 2
+		c.evictOldestRGs(evicted)
+		utils.GetMetrics().RecordEviction(evicted)
 	}
 
 	c.rgs[subID] = &cachedRGs{
@@ -190,6 +196,9 @@ func (c *PreloadCache) SetRGs(subID string, groups []*domain.ResourceGroup, canc
 	}
 	// Clear loading flag
 	delete(c.rgLoading, subID)
+
+	// Update metrics
+	utils.GetMetrics().UpdateCacheSize(len(c.rgs), len(c.res), len(c.fullRes))
 }
 
 // GetRes retrieves cached resources for a resource group
@@ -201,13 +210,16 @@ func (c *PreloadCache) GetRes(subID, rgName string) ([]*domain.Resource, bool) {
 	key := subID + "/" + rgName
 	cached, ok := c.res[key]
 	if !ok {
+		utils.GetMetrics().RecordCacheMiss()
 		return nil, false
 	}
 
 	if c.isExpired(cached.timestamp, resCacheTTL) {
+		utils.GetMetrics().RecordCacheMiss()
 		return nil, false
 	}
 
+	utils.GetMetrics().RecordCacheHit()
 	return cached.resources, true
 }
 
@@ -226,7 +238,9 @@ func (c *PreloadCache) SetRes(subID, rgName string, resources []*domain.Resource
 
 	// Check if we need to evict
 	if len(c.res) >= c.resLimit {
-		c.evictOldestRes(c.resLimit / 2)
+		evicted := c.resLimit / 2
+		c.evictOldestRes(evicted)
+		utils.GetMetrics().RecordEviction(evicted)
 	}
 
 	c.res[key] = &cachedResources{
@@ -236,6 +250,9 @@ func (c *PreloadCache) SetRes(subID, rgName string, resources []*domain.Resource
 	}
 	// Clear loading flag
 	delete(c.resLoading, key)
+
+	// Update metrics
+	utils.GetMetrics().UpdateCacheSize(len(c.rgs), len(c.res), len(c.fullRes))
 }
 
 // IsRGLoading checks if resource groups are currently being loaded for a subscription
@@ -284,13 +301,16 @@ func (c *PreloadCache) GetFullRes(resourceID string) (*domain.Resource, bool) {
 
 	cached, ok := c.fullRes[resourceID]
 	if !ok {
+		utils.GetMetrics().RecordCacheMiss()
 		return nil, false
 	}
 
 	if c.isExpired(cached.timestamp, resCacheTTL) {
+		utils.GetMetrics().RecordCacheMiss()
 		return nil, false
 	}
 
+	utils.GetMetrics().RecordCacheHit()
 	return cached.resource, true
 }
 
@@ -306,7 +326,9 @@ func (c *PreloadCache) SetFullRes(resourceID string, resource *domain.Resource, 
 
 	// Check if we need to evict
 	if len(c.fullRes) >= c.fullResLimit {
-		c.evictOldestFullRes(c.fullResLimit / 2)
+		evicted := c.fullResLimit / 2
+		c.evictOldestFullRes(evicted)
+		utils.GetMetrics().RecordEviction(evicted)
 	}
 
 	c.fullRes[resourceID] = &cachedFullResource{
@@ -316,6 +338,9 @@ func (c *PreloadCache) SetFullRes(resourceID string, resource *domain.Resource, 
 	}
 	// Clear loading flag
 	delete(c.fullResLoading, resourceID)
+
+	// Update metrics
+	utils.GetMetrics().UpdateCacheSize(len(c.rgs), len(c.res), len(c.fullRes))
 }
 
 // IsFullResLoading checks if full resource details are currently being loaded
@@ -364,6 +389,9 @@ func (c *PreloadCache) InvalidateSubs() {
 	c.rgLoading = make(map[string]bool)
 	c.resLoading = make(map[string]bool)
 	c.fullResLoading = make(map[string]bool)
+
+	// Update metrics
+	utils.GetMetrics().UpdateCacheSize(0, 0, 0)
 }
 
 // InvalidateRGs clears cached resource groups for a subscription and their resources
@@ -399,6 +427,9 @@ func (c *PreloadCache) InvalidateRGs(subID string) {
 
 	// Clear loading flag for this subscription
 	delete(c.rgLoading, subID)
+
+	// Update metrics
+	utils.GetMetrics().UpdateCacheSize(len(c.rgs), len(c.res), len(c.fullRes))
 }
 
 // InvalidateRes clears cached resources for a specific resource group
@@ -415,6 +446,9 @@ func (c *PreloadCache) InvalidateRes(subID, rgName string) {
 	}
 	// Clear loading flag
 	delete(c.resLoading, key)
+
+	// Update metrics
+	utils.GetMetrics().UpdateCacheSize(len(c.rgs), len(c.res), len(c.fullRes))
 }
 
 // isExpired checks if a timestamp has exceeded the TTL

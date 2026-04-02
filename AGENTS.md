@@ -115,6 +115,46 @@ The logs are designed to be safe to share for debugging while protecting sensiti
 The goal is to provide enough context to diagnose issues without exposing 
 personally identifiable information or organizational data.
 
+### 3.1 Performance Metrics
+
+The application includes comprehensive performance metrics for validating optimizations:
+
+**Metrics Tracked:**
+- **Cache hits/misses**: Track cache efficiency with hit rate percentage
+- **API call timing**: Average duration of Azure API calls
+- **Cache size**: Current and maximum sizes for all cache tiers
+- **Evictions**: Count of cache evictions due to size limits
+
+**Implementation:**
+```go
+import "github.com/matsest/lazyazure/pkg/utils"
+
+// Record cache hit/miss (automatic in PreloadCache)
+utils.GetMetrics().RecordCacheHit()
+utils.GetMetrics().RecordCacheMiss()
+
+// Record API call timing
+record := utils.StartAPITimer("ListSubscriptions")
+defer record(err)  // Records duration and error status
+
+// Get current stats
+stats := utils.GetMetrics().GetStats()
+fmt.Printf("Hit rate: %.1f%%\n", stats.CacheHitRate)
+
+// Log metrics to debug output
+utils.LogMetrics()
+```
+
+**Viewing Metrics:**
+When `LAZYAZURE_DEBUG=1` is enabled, metrics are automatically logged:
+```
+[2026-04-02 10:15:30.123] [METRICS] Cache: 150 hits, 50 misses (75.0% hit rate), 10 evictions | API: 25 calls, 0 errors, avg 145ms | Size: RG=10/20, Res=50/100, FullRes=25/50
+```
+
+The metrics are stored in a global singleton (`utils.GetMetrics()`) and updated automatically by:
+- `PreloadCache` for cache operations (hit/miss, size, evictions)
+- Azure client methods for API call timing (via `StartAPITimer`)
+
 ### 4. Layout and Panels
 
 #### Stacked Panel Layout
@@ -544,6 +584,8 @@ pkg/
 └── utils/          # Utilities
     ├── logger.go            # Debug logging (opt-in via LAZYAZURE_DEBUG)
     ├── logger_test.go       # Logger tests with privacy protection
+    ├── metrics.go           # Performance metrics tracking (cache hits, API timing)
+    ├── metrics_test.go      # Metrics tests
     ├── clipboard.go         # Clipboard operations (cross-platform)
     ├── browser.go           # Browser opening operations (cross-platform)
     ├── browser_test.go      # Browser utility tests

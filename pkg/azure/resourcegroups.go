@@ -6,6 +6,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 	"github.com/matsest/lazyazure/pkg/domain"
+	"github.com/matsest/lazyazure/pkg/utils"
 )
 
 // ResourceGroupsClient wraps the Azure resource groups client
@@ -29,6 +30,8 @@ func NewResourceGroupsClient(client *Client, subscriptionID string) (*ResourceGr
 
 // ListResourceGroups retrieves all resource groups in the subscription
 func (c *ResourceGroupsClient) ListResourceGroups(ctx context.Context) ([]*domain.ResourceGroup, error) {
+	record := utils.StartAPITimer("ListResourceGroups")
+
 	pager := c.client.NewListPager(nil)
 
 	var resourceGroups []*domain.ResourceGroup
@@ -36,6 +39,7 @@ func (c *ResourceGroupsClient) ListResourceGroups(ctx context.Context) ([]*domai
 	for pager.More() {
 		page, err := pager.NextPage(ctx)
 		if err != nil {
+			record(err)
 			return nil, fmt.Errorf("failed to list resource groups: %w", err)
 		}
 
@@ -53,6 +57,10 @@ func (c *ResourceGroupsClient) ListResourceGroups(ctx context.Context) ([]*domai
 		}
 	}
 
+	record(nil)
+	if utils.IsDebugEnabled() {
+		utils.Log("[API] ListResourceGroups loaded %d resource groups", len(resourceGroups))
+	}
 	return resourceGroups, nil
 }
 

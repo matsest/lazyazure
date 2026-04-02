@@ -602,6 +602,8 @@ func (gui *Gui) quit(g *gocui.Gui, v *gocui.View) error {
 	utils.Log("quit: Ctrl+C or q pressed - quitting application")
 	gui.taskManager.StopAll()
 	utils.Log("quit: Task manager stopped")
+	utils.LogMetrics()
+	utils.Log("quit: Metrics logged, shutting down")
 	return gocui.ErrQuit
 }
 
@@ -2937,7 +2939,7 @@ func (gui *Gui) loadSubscriptions() {
 				return nil
 			})
 
-			utils.Log("loadSubscriptions: Completed in %v, loaded %d subscriptions", time.Since(startTime), len(subs))
+			utils.Log("loadSubscriptions: Loaded %d subscriptions", len(subs))
 
 			// Trigger background preload of resource groups if we have a selected subscription
 			gui.mu.RLock()
@@ -3022,7 +3024,7 @@ func (gui *Gui) loadResourceGroups(subscriptionID string) {
 					return nil
 				})
 
-				utils.Log("loadResourceGroups: Completed in %v, loaded %d resource groups", time.Since(startTime), len(rgs))
+				utils.Log("loadResourceGroups: Loaded %d resource groups", len(rgs))
 
 				// Trigger background preload of resources for top 5 RGs
 				gui.preloadTopResources(subscriptionID, rgs)
@@ -3095,7 +3097,7 @@ func (gui *Gui) loadResources(subscriptionID string, resourceGroupName string) {
 					return nil
 				})
 
-				utils.Log("loadResources: Completed in %v, loaded %d resources", time.Since(startTime), len(resources))
+				utils.Log("loadResources: Loaded %d resources", len(resources))
 			}
 		}
 
@@ -3372,8 +3374,6 @@ func (gui *Gui) loadResourceDetails(originalRes *domain.Resource) {
 	})
 
 	go func() {
-		startTime := time.Now()
-
 		// Check if full resource details are already cached
 		if cachedRes, ok := gui.preloadCache.GetFullRes(originalRes.ID); ok {
 			utils.Log("loadResourceDetails: Using cached full details")
@@ -3484,7 +3484,7 @@ func (gui *Gui) loadResourceDetails(originalRes *domain.Resource) {
 			return nil
 		})
 
-		utils.Log("loadResourceDetails: Completed in %v", time.Since(startTime))
+		utils.Log("loadResourceDetails: Completed")
 	}()
 }
 
@@ -3820,7 +3820,6 @@ func (gui *Gui) preloadResourceGroups(subscriptionID string) {
 		defer cancel()
 		defer gui.preloadCache.SetRGLoading(subscriptionID, false)
 
-		startTime := time.Now()
 		rgClient, err := gui.clientFactory.NewResourceGroupsClient(subscriptionID)
 		if err != nil {
 			utils.Log("preloadResourceGroups: Error creating client: %v", err)
@@ -3840,7 +3839,7 @@ func (gui *Gui) preloadResourceGroups(subscriptionID string) {
 
 		// Store in cache
 		gui.preloadCache.SetRGs(subscriptionID, rgs, cancel)
-		utils.Log("preloadResourceGroups: Completed in %v, cached %d RGs", time.Since(startTime), len(rgs))
+		utils.Log("preloadResourceGroups: Cached %d RGs", len(rgs))
 
 		// Now preload resources for top 5 RGs
 		gui.preloadTopResources(subscriptionID, rgs)

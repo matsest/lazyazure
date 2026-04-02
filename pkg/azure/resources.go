@@ -40,6 +40,8 @@ func NewResourcesClient(client *Client, subscriptionID string) (*ResourcesClient
 
 // ListResourcesByResourceGroup retrieves all resources in a specific resource group
 func (c *ResourcesClient) ListResourcesByResourceGroup(ctx context.Context, resourceGroupName string) ([]*domain.Resource, error) {
+	record := utils.StartAPITimer("ListResourcesByResourceGroup")
+
 	// Create filter to get resources only in the specified resource group
 	filter := fmt.Sprintf("resourceGroup eq '%s'", resourceGroupName)
 	// Expand to get additional properties like createdTime, changedTime, provisioningState
@@ -56,6 +58,7 @@ func (c *ResourcesClient) ListResourcesByResourceGroup(ctx context.Context, reso
 	for pager.More() {
 		page, err := pager.NextPage(ctx)
 		if err != nil {
+			record(err)
 			return nil, fmt.Errorf("failed to list resources in resource group %s: %w", resourceGroupName, err)
 		}
 
@@ -83,23 +86,29 @@ func (c *ResourcesClient) ListResourcesByResourceGroup(ctx context.Context, reso
 		}
 	}
 
+	record(nil)
+	if utils.IsDebugEnabled() {
+		utils.Log("[API] ListResourcesByResourceGroup loaded %d resources", len(resources))
+	}
 	return resources, nil
 }
 
 // GetResource retrieves a specific resource by ID with full properties
 func (c *ResourcesClient) GetResource(ctx context.Context, resourceID string, resourceType string) (*domain.Resource, error) {
+	defer utils.StartAPITimer("GetResource")(nil)
+
 	// Get the latest API version for this resource type from Azure
 	apiVersion, err := c.apiVersionCache.GetLatestAPIVersion(ctx, resourceType)
 	if err != nil {
-		utils.Log("GetResource: Failed to get API version for %s, using default: %v", resourceType, err)
+		utils.Log("GetResource: Failed to get API version, using default: %v", err)
 		apiVersion = "2024-03-01" // Fallback to recent stable version
 	}
 
-	utils.Log("GetResource: Using API version %s for resource type %s", apiVersion, resourceType)
+	utils.Log("GetResource: Using API version %s", apiVersion)
 
 	resp, err := c.client.GetByID(ctx, resourceID, apiVersion, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get resource %s: %w", resourceID, err)
+		return nil, fmt.Errorf("failed to get resource: %w", err)
 	}
 
 	// Parse resource ID to extract resource group
