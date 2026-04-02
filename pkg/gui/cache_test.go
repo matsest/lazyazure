@@ -95,7 +95,7 @@ func TestPreloadCache_RGsExpiration(t *testing.T) {
 	// Manually expire the entry by setting timestamp to past
 	cache.mu.Lock()
 	cached := cache.rgs[subID]
-	cached.timestamp = time.Now().Add(-6 * time.Minute) // Expired (5min TTL)
+	cached.timestamp = time.Now().Add(-16 * time.Minute) // Expired (15min TTL)
 	cache.mu.Unlock()
 
 	// Should not exist after expiration
@@ -167,7 +167,7 @@ func TestPreloadCache_ResExpiration(t *testing.T) {
 	cache.mu.Lock()
 	key := subID + "/" + rgName
 	cached := cache.res[key]
-	cached.timestamp = time.Now().Add(-4 * time.Minute) // Expired (3min TTL)
+	cached.timestamp = time.Now().Add(-11 * time.Minute) // Expired (10min TTL)
 	cache.mu.Unlock()
 
 	// Should not exist after expiration
@@ -665,7 +665,7 @@ func TestPreloadCache_FullResourceExpiration(t *testing.T) {
 	// Manually expire the entry
 	cache.mu.Lock()
 	cached := cache.fullRes[resID]
-	cached.timestamp = time.Now().Add(-4 * time.Minute) // Expired (3min TTL)
+	cached.timestamp = time.Now().Add(-11 * time.Minute) // Expired (10min TTL)
 	cache.mu.Unlock()
 
 	// Should not exist after expiration

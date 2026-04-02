@@ -14,8 +14,8 @@ import (
 
 // Cache sizing constants - base values
 const (
-	rgCacheTTL   = 5 * time.Minute
-	resCacheTTL  = 3 * time.Minute
+	rgCacheTTL   = 15 * time.Minute
+	resCacheTTL  = 10 * time.Minute
 	baseRGCache  = 100
 	baseResCache = 500
 )
