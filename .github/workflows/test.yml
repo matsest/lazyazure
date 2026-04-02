@@ -44,6 +44,41 @@ jobs:
           exit 1
         fi
 
+    - name: Check for sensitive data in Log() calls
+      run: |
+        # Per AGENTS.md privacy guidelines - never log sensitive data
+        # Check for sensitive variable names being passed as arguments to Log()
+        # Safe boolean indicators (e.g., has_upn=%v) are allowed
+        # Excludes test files (where we intentionally test for violations)
+        
+        # Pattern explanation:
+        # - Find lines with Log( calls
+        # - Exclude test files and safe boolean patterns (has_*)
+        # - Look for sensitive variable names as actual arguments (not in format strings)
+        violations=$(grep -rn 'utils\.Log\|Log(' --include="*.go" . | \
+          grep -v "_test.go" | \
+          grep -vE "(has_upn|has_subscription|has_tenant|has_resource|has_object|has_display)" | \
+          grep -E "\b(userPrincipalName|subscriptionID|tenantID|resourceID|objectID|displayName)\b" || true)
+        
+        if [ -n "$violations" ]; then
+          echo "ERROR: Potential sensitive data logging detected:"
+          echo "$violations"
+          echo ""
+          echo "Per AGENTS.md privacy guidelines, debug logs must not contain:"
+          echo "  - User Principal Names (UPN/email addresses)"
+          echo "  - Display names"
+          echo "  - Tenant IDs or Object IDs"
+          echo "  - Resource IDs (full Azure resource IDs, subscription IDs, resource group IDs)"
+          echo ""
+          echo "Use safe alternatives:"
+          echo "  ✓ has_upn=%v (boolean indicator)"
+          echo "  ✓ Found at index 5 (position instead of ID)"
+          echo "  ✓ Loaded 20 subscriptions (count)"
+          echo "  ✓ resource-1 (anonymized identifier)"
+          exit 1
+        fi
+        echo "✓ No sensitive data logging patterns detected"
+
     - name: Run tests
       run: make test-ci
 

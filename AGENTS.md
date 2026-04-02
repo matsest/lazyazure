@@ -740,6 +740,7 @@ Before finishing a session or committing changes:
 - [ ] Code is properly formatted: `gofmt -l .` returns empty
 - [ ] Modules are tidy: `go mod tidy`
 - [ ] Debug logging is properly guarded with `LAZYAZURE_DEBUG` check
+- [ ] Debug logging does NOT contain sensitive data (UPN, IDs, resource IDs) - see Debug Logging Privacy section
 - [ ] No mutex deadlocks introduced (verify lock patterns)
 - [ ] **Third-party dependencies updated**:
   - [ ] THIRD-PARTY-NOTICES.txt updated with full license text for any new dependencies
