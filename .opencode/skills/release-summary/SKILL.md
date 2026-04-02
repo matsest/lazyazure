@@ -75,9 +75,24 @@ Create a concise summary with these sections:
 - Use technical jargon without explanation
 - Include every single commit (focus on important ones)
 
-### 6. Example Output (as markdown)
+### 6. Output Format
 
-For v0.2.5 (based on commits):
+**CRITICAL**: Always output the release summary wrapped in a **markdown code block** (triple backticks) so users can copy the literal markdown text. The content inside the code block should be valid markdown that can be pasted directly into GitHub releases or other documentation.
+
+Format your output like this:
+
+````
+```markdown
+## What's New in vX.Y.Z
+
+[Your content here]
+```
+````
+
+### 7. Example Output
+
+For v0.2.5 (based on commits), output exactly this:
+
 ```markdown
 ## What's New in v0.2.5
 
