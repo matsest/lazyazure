@@ -3816,8 +3816,25 @@ func (gui *Gui) preloadResourceGroups(subscriptionID string) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// Acquire semaphore slot before starting goroutine
+	semaphore := gui.preloadCache.GetSemaphore()
+	acquireStart := time.Now()
+	if err := semaphore.Acquire(ctx); err != nil {
+		// Context cancelled (user switched away), abort
+		utils.Log("preloadResourceGroups: Context cancelled, aborting")
+		gui.preloadCache.SetRGLoading(subscriptionID, false)
+		cancel()
+		return
+	}
+	acquireDuration := time.Since(acquireStart)
+	if acquireDuration > 100*time.Millisecond {
+		inUse, capacity := semaphore.GetUtilization()
+		utils.Log("preloadResourceGroups: Waited %v for semaphore slot (%d/%d in use)", acquireDuration, inUse, capacity)
+	}
+
 	go func() {
 		defer cancel()
+		defer semaphore.Release()
 		defer gui.preloadCache.SetRGLoading(subscriptionID, false)
 
 		rgClient, err := gui.clientFactory.NewResourceGroupsClient(subscriptionID)
@@ -3841,7 +3858,7 @@ func (gui *Gui) preloadResourceGroups(subscriptionID string) {
 		gui.preloadCache.SetRGs(subscriptionID, rgs, cancel)
 		utils.Log("preloadResourceGroups: Cached %d RGs", len(rgs))
 
-		// Now preload resources for top 5 RGs
+		// Now preload resources for top 10 RGs
 		gui.preloadTopResources(subscriptionID, rgs)
 	}()
 }
@@ -3859,6 +3876,8 @@ func (gui *Gui) preloadTopResources(subscriptionID string, rgs []*domain.Resourc
 	}
 
 	utils.Log("preloadTopResources: Preloading resources for top %d RGs", count)
+
+	semaphore := gui.preloadCache.GetSemaphore()
 
 	for i := 0; i < count; i++ {
 		rgName := rgs[i].Name
@@ -3878,10 +3897,28 @@ func (gui *Gui) preloadTopResources(subscriptionID string, rgs []*domain.Resourc
 		// Mark as loading
 		gui.preloadCache.SetResLoading(subscriptionID, rgName, true)
 
+		// Create context for this preload operation
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+
+		// Acquire semaphore slot before starting goroutine
+		acquireStart := time.Now()
+		if err := semaphore.Acquire(ctx); err != nil {
+			// Context cancelled or timeout, abort this preload
+			utils.Log("preloadTopResources: Could not acquire semaphore for RG #%d, aborting", i)
+			gui.preloadCache.SetResLoading(subscriptionID, rgName, false)
+			cancel()
+			continue
+		}
+		acquireDuration := time.Since(acquireStart)
+		if acquireDuration > 100*time.Millisecond {
+			inUse, capacity := semaphore.GetUtilization()
+			utils.Log("preloadTopResources: Waited %v for semaphore slot (RG #%d, %d/%d in use)", acquireDuration, i, inUse, capacity)
+		}
+
 		// Preload this RG's resources in background
 		go func(rgName string, index int) {
+			defer semaphore.Release()
 			defer gui.preloadCache.SetResLoading(subscriptionID, rgName, false)
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
 			resClient, err := gui.clientFactory.NewResourcesClient(subscriptionID)

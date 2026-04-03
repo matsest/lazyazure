@@ -20,6 +20,10 @@ const (
 	baseResCache = 500
 )
 
+// MaxConcurrentPreloads limits concurrent background loading operations
+// to prevent excessive goroutine spawning and API rate limiting
+const MaxConcurrentPreloads = 50
+
 // Cache size tiers
 const (
 	smallRGCache  = 100
@@ -113,6 +117,55 @@ type cachedFullResource struct {
 	cancel    context.CancelFunc
 }
 
+// Semaphore provides a weighted semaphore for limiting concurrent operations
+type Semaphore struct {
+	ch    chan struct{}
+	cap   int
+	mu    sync.RWMutex
+	inUse int
+}
+
+// NewSemaphore creates a new semaphore with the given capacity
+func NewSemaphore(n int) *Semaphore {
+	return &Semaphore{
+		ch:  make(chan struct{}, n),
+		cap: n,
+	}
+}
+
+// Acquire acquires a slot in the semaphore, blocking until one is available
+// or the context is cancelled. Returns context error if cancelled.
+func (s *Semaphore) Acquire(ctx context.Context) error {
+	select {
+	case s.ch <- struct{}{}:
+		s.mu.Lock()
+		s.inUse++
+		s.mu.Unlock()
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// Release releases a slot in the semaphore
+func (s *Semaphore) Release() {
+	select {
+	case <-s.ch:
+		s.mu.Lock()
+		s.inUse--
+		s.mu.Unlock()
+	default:
+		// Should never happen - releasing without acquiring
+	}
+}
+
+// GetUtilization returns current semaphore usage stats (inUse, capacity)
+func (s *Semaphore) GetUtilization() (inUse, capacity int) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.inUse, s.cap
+}
+
 // PreloadCache provides in-memory caching for resource groups and resources
 // with TTL-based expiration and size limits
 type PreloadCache struct {
@@ -126,6 +179,7 @@ type PreloadCache struct {
 	rgLoading      map[string]bool // Track in-progress RG preloads
 	resLoading     map[string]bool // Track in-progress resource preloads
 	fullResLoading map[string]bool // Track in-progress full resource detail loads
+	semaphore      *Semaphore      // Limits concurrent background operations
 }
 
 // NewPreloadCache creates a new preload cache with environment-based limits
@@ -147,6 +201,7 @@ func NewPreloadCacheWithConfig(config CacheConfig) *PreloadCache {
 		rgLoading:      make(map[string]bool),
 		resLoading:     make(map[string]bool),
 		fullResLoading: make(map[string]bool),
+		semaphore:      NewSemaphore(MaxConcurrentPreloads),
 	}
 }
 
@@ -546,4 +601,9 @@ func (c *PreloadCache) GetCacheStats() (rgCount, resCount, fullResCount int) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return len(c.rgs), len(c.res), len(c.fullRes)
+}
+
+// GetSemaphore returns the semaphore for limiting concurrent operations
+func (c *PreloadCache) GetSemaphore() *Semaphore {
+	return c.semaphore
 }

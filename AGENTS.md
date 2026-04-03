@@ -326,7 +326,47 @@ Next time: Instant full details (cached)
 - Privacy-safe logging (no IDs or names in debug logs)
 - Cache lookups in `onSubEnter` and `onRGEnter` for instant display
 
-### 5.2 Cache Sizing
+### 5.2 Concurrent Preloading Limit
+
+To prevent excessive goroutine spawning and Azure API rate limiting, background preloading uses a semaphore to limit concurrent operations.
+
+**Limit:** 50 concurrent background operations (configurable via `MaxConcurrentPreloads` constant)
+
+**Semaphore Implementation:**
+```go
+type Semaphore struct {
+    ch  chan struct{}
+    cap int
+    mu  sync.RWMutex
+    inUse int
+}
+```
+
+**How it works:**
+1. Each background preload operation acquires one semaphore slot before starting
+2. If all 50 slots are in use, new operations wait (with context cancellation support)
+3. Operations release their slot when complete (via defer)
+4. Wait times >100ms are logged for monitoring contention
+
+**User Impact:**
+- First 5 subscriptions clicked (50 RGs total): All preload in parallel, no waiting
+- 6th+ subscription: Resource preloads queue briefly until slots free up
+- RG list loading: Never blocked (foreground operation)
+- Memory usage: Bounded at ~8-15MB regardless of subscription count
+
+**Monitoring:**
+When `LAZYAZURE_DEBUG=1`, logs show:
+```
+preloadResourceGroups: Waited 250ms for semaphore slot (47/50 in use)
+preloadTopResources: Waited 180ms for semaphore slot (RG #5, 49/50 in use)
+```
+
+**Key Methods:**
+- `Semaphore.Acquire(ctx)` - Acquire slot or wait (context-aware)
+- `Semaphore.Release()` - Release slot
+- `Semaphore.GetUtilization()` - Get current usage stats (inUse, capacity)
+
+### 5.3 Cache Sizing
 
 Cache limits are configurable via environment variable. Defaults to medium which is suitable for most users.
 

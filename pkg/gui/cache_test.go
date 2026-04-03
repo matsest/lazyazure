@@ -1120,3 +1120,100 @@ func TestPreloadCache_MetricsOnInvalidate(t *testing.T) {
 		t.Errorf("Expected RG size 0 after invalidate, got %d", stats.CurrentRGSize)
 	}
 }
+
+// Semaphore tests
+
+func TestSemaphore_New(t *testing.T) {
+	s := NewSemaphore(10)
+	if s == nil {
+		t.Fatal("NewSemaphore returned nil")
+	}
+	if s.ch == nil {
+		t.Fatal("Semaphore channel not initialized")
+	}
+}
+
+func TestSemaphore_AcquireAndRelease(t *testing.T) {
+	s := NewSemaphore(2)
+	ctx := context.Background()
+
+	// Should be able to acquire twice
+	if err := s.Acquire(ctx); err != nil {
+		t.Fatalf("First acquire failed: %v", err)
+	}
+	if err := s.Acquire(ctx); err != nil {
+		t.Fatalf("Second acquire failed: %v", err)
+	}
+
+	// Release one
+	s.Release()
+
+	// Should be able to acquire again
+	if err := s.Acquire(ctx); err != nil {
+		t.Fatalf("Third acquire after release failed: %v", err)
+	}
+
+	// Release remaining
+	s.Release()
+	s.Release()
+}
+
+func TestSemaphore_AcquireContextCancellation(t *testing.T) {
+	s := NewSemaphore(1)
+	ctx1 := context.Background()
+
+	// Acquire the only slot
+	if err := s.Acquire(ctx1); err != nil {
+		t.Fatalf("First acquire failed: %v", err)
+	}
+
+	// Create a context that will be cancelled
+	ctx2, cancel := context.WithCancel(context.Background())
+
+	// Start acquiring in a goroutine (will block)
+	done := make(chan error, 1)
+	go func() {
+		done <- s.Acquire(ctx2)
+	}()
+
+	// Cancel the context
+	cancel()
+
+	// Should receive context error
+	select {
+	case err := <-done:
+		if err != context.Canceled {
+			t.Errorf("Expected context.Canceled, got %v", err)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Error("Acquire did not return after context cancellation")
+	}
+
+	// Release the slot
+	s.Release()
+}
+
+func TestSemaphore_PreloadCacheIntegration(t *testing.T) {
+	cache := NewPreloadCache()
+	semaphore := cache.GetSemaphore()
+
+	if semaphore == nil {
+		t.Fatal("PreloadCache semaphore is nil")
+	}
+
+	// Should be able to acquire from cache's semaphore
+	ctx := context.Background()
+	if err := semaphore.Acquire(ctx); err != nil {
+		t.Fatalf("Acquire from cache semaphore failed: %v", err)
+	}
+
+	// Release
+	semaphore.Release()
+}
+
+func TestSemaphore_MaxConcurrentPreloadsConstant(t *testing.T) {
+	// Verify the constant is set to expected value
+	if MaxConcurrentPreloads != 50 {
+		t.Errorf("Expected MaxConcurrentPreloads to be 50, got %d", MaxConcurrentPreloads)
+	}
+}
