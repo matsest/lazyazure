@@ -42,6 +42,60 @@ func formatWithGraySuffix(name, suffix string) string {
 	return name + " " + grayColor + "(" + suffix + ")" + resetColor
 }
 
+// sortSubscriptions sorts subscriptions by name (case-insensitive) with pre-computed lowercase
+func sortSubscriptions(subs []*domain.Subscription) {
+	type item struct {
+		sub       *domain.Subscription
+		lowerName string
+	}
+	items := make([]item, len(subs))
+	for i, s := range subs {
+		items[i] = item{s, strings.ToLower(s.Name)}
+	}
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].lowerName < items[j].lowerName
+	})
+	for i, it := range items {
+		subs[i] = it.sub
+	}
+}
+
+// sortResourceGroups sorts resource groups by name (case-insensitive) with pre-computed lowercase
+func sortResourceGroups(rgs []*domain.ResourceGroup) {
+	type item struct {
+		rg        *domain.ResourceGroup
+		lowerName string
+	}
+	items := make([]item, len(rgs))
+	for i, rg := range rgs {
+		items[i] = item{rg, strings.ToLower(rg.Name)}
+	}
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].lowerName < items[j].lowerName
+	})
+	for i, it := range items {
+		rgs[i] = it.rg
+	}
+}
+
+// sortResources sorts resources by name (case-insensitive) with pre-computed lowercase
+func sortResources(resources []*domain.Resource) {
+	type item struct {
+		res       *domain.Resource
+		lowerName string
+	}
+	items := make([]item, len(resources))
+	for i, r := range resources {
+		items[i] = item{r, strings.ToLower(r.Name)}
+	}
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].lowerName < items[j].lowerName
+	})
+	for i, it := range items {
+		resources[i] = it.res
+	}
+}
+
 // getLoadingText returns the current loading message if any panel is loading
 func (gui *Gui) getLoadingText() string {
 	gui.mu.RLock()
@@ -2185,9 +2239,7 @@ func (gui *Gui) refresh(g *gocui.Gui, v *gocui.View) error {
 					utils.Log("refresh: Error loading subscriptions: %v", err)
 				} else {
 					// Sort subscriptions alphabetically
-					sort.Slice(subs, func(i, j int) bool {
-						return strings.ToLower(subs[i].Name) < strings.ToLower(subs[j].Name)
-					})
+					sortSubscriptions(subs)
 
 					gui.mu.Lock()
 					gui.subscriptions = subs
@@ -2224,9 +2276,7 @@ func (gui *Gui) refresh(g *gocui.Gui, v *gocui.View) error {
 					utils.Log("refresh: Error loading resource groups: %v", err)
 				} else {
 					// Sort RGs alphabetically
-					sort.Slice(rgs, func(i, j int) bool {
-						return strings.ToLower(rgs[i].Name) < strings.ToLower(rgs[j].Name)
-					})
+					sortResourceGroups(rgs)
 
 					gui.mu.Lock()
 					gui.resourceGroups = rgs
@@ -2263,9 +2313,7 @@ func (gui *Gui) refresh(g *gocui.Gui, v *gocui.View) error {
 					utils.Log("refresh: Error loading resources: %v", err)
 				} else {
 					// Sort resources alphabetically
-					sort.Slice(resources, func(i, j int) bool {
-						return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
-					})
+					sortResources(resources)
 
 					gui.mu.Lock()
 					gui.resources = resources
@@ -2917,9 +2965,7 @@ func (gui *Gui) loadSubscriptions() {
 			utils.Log("loadSubscriptions: Error after %v: %v", time.Since(startTime), err)
 		} else {
 			// Sort subscriptions alphabetically by name (case-insensitive)
-			sort.Slice(subs, func(i, j int) bool {
-				return strings.ToLower(subs[i].Name) < strings.ToLower(subs[j].Name)
-			})
+			sortSubscriptions(subs)
 
 			gui.mu.Lock()
 			gui.subscriptions = subs
@@ -2991,9 +3037,7 @@ func (gui *Gui) loadResourceGroups(subscriptionID string) {
 				utils.Log("loadResourceGroups: Error listing RGs after %v: %v", time.Since(startTime), err)
 			} else {
 				// Sort resource groups alphabetically by name (case-insensitive)
-				sort.Slice(rgs, func(i, j int) bool {
-					return strings.ToLower(rgs[i].Name) < strings.ToLower(rgs[j].Name)
-				})
+				sortResourceGroups(rgs)
 
 				gui.mu.Lock()
 				gui.resourceGroups = rgs
@@ -3072,9 +3116,7 @@ func (gui *Gui) loadResources(subscriptionID string, resourceGroupName string) {
 				utils.Log("loadResources: Error listing resources after %v: %v", time.Since(startTime), err)
 			} else {
 				// Sort resources alphabetically by name (case-insensitive)
-				sort.Slice(resources, func(i, j int) bool {
-					return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
-				})
+				sortResources(resources)
 
 				gui.mu.Lock()
 				gui.resources = resources
@@ -3144,9 +3186,7 @@ func (gui *Gui) loadSubscriptionsWithSelection(savedSubID string) {
 			utils.Log("loadSubscriptionsWithSelection: Error: %v", err)
 		} else {
 			// Sort subscriptions alphabetically by name (case-insensitive)
-			sort.Slice(subs, func(i, j int) bool {
-				return strings.ToLower(subs[i].Name) < strings.ToLower(subs[j].Name)
-			})
+			sortSubscriptions(subs)
 
 			gui.mu.Lock()
 			gui.subscriptions = subs
@@ -3223,9 +3263,7 @@ func (gui *Gui) loadResourceGroupsWithSelection(subscriptionID, savedRGID string
 				utils.Log("loadResourceGroupsWithSelection: Error listing RGs: %v", err)
 			} else {
 				// Sort resource groups alphabetically by name (case-insensitive)
-				sort.Slice(rgs, func(i, j int) bool {
-					return strings.ToLower(rgs[i].Name) < strings.ToLower(rgs[j].Name)
-				})
+				sortResourceGroups(rgs)
 
 				gui.mu.Lock()
 				gui.resourceGroups = rgs
@@ -3305,9 +3343,7 @@ func (gui *Gui) loadResourcesWithSelection(subscriptionID, resourceGroupName, sa
 				utils.Log("loadResourcesWithSelection: Error listing resources: %v", err)
 			} else {
 				// Sort resources alphabetically by name (case-insensitive)
-				sort.Slice(resources, func(i, j int) bool {
-					return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
-				})
+				sortResources(resources)
 
 				gui.mu.Lock()
 				gui.resources = resources
@@ -3847,9 +3883,7 @@ func (gui *Gui) preloadResourceGroups(subscriptionID string) {
 		}
 
 		// Sort resource groups alphabetically
-		sort.Slice(rgs, func(i, j int) bool {
-			return strings.ToLower(rgs[i].Name) < strings.ToLower(rgs[j].Name)
-		})
+		sortResourceGroups(rgs)
 
 		// Store in cache
 		gui.preloadCache.SetRGs(subscriptionID, rgs, cancel)
@@ -3928,9 +3962,7 @@ func (gui *Gui) preloadTopResources(subscriptionID string, rgs []*domain.Resourc
 			}
 
 			// Sort resources alphabetically
-			sort.Slice(resources, func(i, j int) bool {
-				return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
-			})
+			sortResources(resources)
 
 			// Store in cache
 			gui.preloadCache.SetRes(subscriptionID, rgName, resources, cancel)

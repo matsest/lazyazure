@@ -2,8 +2,6 @@ package gui
 
 import (
 	"context"
-	"sort"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -331,9 +329,7 @@ func TestSubscriptionSorting(t *testing.T) {
 			copy(subs, tt.input)
 
 			// Apply the same sorting logic as in loadSubscriptions
-			sort.Slice(subs, func(i, j int) bool {
-				return strings.ToLower(subs[i].Name) < strings.ToLower(subs[j].Name)
-			})
+			sortSubscriptions(subs)
 
 			// Verify the order
 			if len(subs) != len(tt.expected) {
@@ -383,9 +379,7 @@ func TestResourceGroupSorting(t *testing.T) {
 			copy(rgs, tt.input)
 
 			// Apply the same sorting logic as in loadResourceGroups
-			sort.Slice(rgs, func(i, j int) bool {
-				return strings.ToLower(rgs[i].Name) < strings.ToLower(rgs[j].Name)
-			})
+			sortResourceGroups(rgs)
 
 			// Verify the order
 			if len(rgs) != len(tt.expected) {
@@ -435,9 +429,7 @@ func TestResourceSorting(t *testing.T) {
 			copy(resources, tt.input)
 
 			// Apply the same sorting logic as in loadResources
-			sort.Slice(resources, func(i, j int) bool {
-				return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
-			})
+			sortResources(resources)
 
 			// Verify the order
 			if len(resources) != len(tt.expected) {
