@@ -155,6 +155,43 @@ The metrics are stored in a global singleton (`utils.GetMetrics()`) and updated 
 - `PreloadCache` for cache operations (hit/miss, size, evictions)
 - Azure client methods for API call timing (via `StartAPITimer`)
 
+### 3.2 Timing and Layout Constants
+
+Application-wide constants are centralized in `pkg/gui/gui.go` for maintainability:
+
+**Timing Constants:**
+```go
+const (
+    APITimeout             = 30 * time.Second  // Azure API calls
+    ShortAPITimeout        = 10 * time.Second  // Quick operations
+    VersionCheckTimeout    = 10 * time.Second  // GitHub API version check
+    HTTPClientTimeout      = 10 * time.Second  // General HTTP requests
+    VersionDisplayDuration = 5 * time.Second   // How long version info shows
+    StatusMessageDuration  = 2 * time.Second   // Status bar message duration
+)
+```
+
+**Layout Constants:**
+```go
+const (
+    AuthViewHeight = 5  // Lines reserved for auth panel
+)
+```
+
+**Concurrent Operation Limits:**
+```go
+const (
+    MaxConcurrentPreloads   = 50            // Background preload goroutines
+    SemaphoreWaitThreshold  = 100 * time.Millisecond  // Log warning threshold
+)
+```
+
+**Benefits:**
+- Single location to adjust timeouts and limits
+- Self-documenting code (e.g., `APITimeout` vs `30 * time.Second`)
+- Easier to write tests with different values
+- Prevents magic number proliferation
+
 ### 4. Layout and Panels
 
 #### Stacked Panel Layout
@@ -333,20 +370,39 @@ To prevent excessive goroutine spawning and Azure API rate limiting, background 
 **Limit:** 50 concurrent background operations (configurable via `MaxConcurrentPreloads` constant)
 
 **Semaphore Implementation:**
+The semaphore uses a channel as the single source of truth for simplicity and correctness:
+
 ```go
 type Semaphore struct {
-    ch  chan struct{}
-    cap int
-    mu  sync.RWMutex
-    inUse int
+    ch chan struct{}  // Buffered channel acts as slots
+}
+
+func (s *Semaphore) Acquire(ctx context.Context) error {
+    select {
+    case s.ch <- struct{}{}:  // Blocks when at capacity
+        return nil
+    case <-ctx.Done():
+        return ctx.Err()
+    }
+}
+
+func (s *Semaphore) Release() {
+    <-s.ch  // Free up a slot
 }
 ```
 
 **How it works:**
-1. Each background preload operation acquires one semaphore slot before starting
-2. If all 50 slots are in use, new operations wait (with context cancellation support)
-3. Operations release their slot when complete (via defer)
-4. Wait times >100ms are logged for monitoring contention
+1. Channel is buffered with capacity equal to `MaxConcurrentPreloads`
+2. Each `Acquire()` sends to the channel - blocks when full (natural backpressure)
+3. Channel length gives accurate in-use count (`len(s.ch)`)
+4. `Release()` receives from channel to free a slot
+5. No separate mutex or counter needed - channel provides thread-safety
+
+**Why this design:**
+- **Simple**: Single source of truth (the channel)
+- **Race-free**: Channel operations are atomic
+- **Context-aware**: Respects cancellation while waiting
+- **No deadlocks**: No lock hierarchy to violate
 
 **User Impact:**
 - First 5 subscriptions clicked (50 RGs total): All preload in parallel, no waiting
