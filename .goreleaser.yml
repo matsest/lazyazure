@@ -42,12 +42,12 @@ changelog:
       - Merge branch
   groups:
     - title: Features
-      regexp: "^feat[\\w-]*:"
+      regexp: "^feat(\\([\\w-]+\\))?:"
       order: 0
     - title: Improvements
-      regexp: "^fix[\\w-]*:"
+      regexp: "^fix(\\([\\w-]+\\))?:"
       order: 1
-    - title: Other 
+    - title: Other
       order: 999
 
 release:
