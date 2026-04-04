@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
@@ -142,21 +143,12 @@ func parseResourceID(resourceID string) map[string]string {
 	}
 
 	// Resource ID format: /subscriptions/{sub}/resourceGroups/{rg}/providers/{provider}/{type}/{name}
-	// Split by /
+	// Split by / and filter out empty parts
 	parts := make([]string, 0)
-	current := ""
-	for _, char := range resourceID {
-		if char == '/' {
-			if current != "" {
-				parts = append(parts, current)
-				current = ""
-			}
-		} else {
-			current += string(char)
+	for _, part := range strings.Split(resourceID, "/") {
+		if part != "" {
+			parts = append(parts, part)
 		}
-	}
-	if current != "" {
-		parts = append(parts, current)
 	}
 
 	// Parse parts
