@@ -3,6 +3,7 @@ package gui
 import (
 	"context"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -1215,5 +1216,179 @@ func TestSemaphore_MaxConcurrentPreloadsConstant(t *testing.T) {
 	// Verify the constant is set to expected value
 	if MaxConcurrentPreloads != 50 {
 		t.Errorf("Expected MaxConcurrentPreloads to be 50, got %d", MaxConcurrentPreloads)
+	}
+}
+
+func TestPreloadCache_TryStartRGLoading(t *testing.T) {
+	cache := NewPreloadCacheWithConfig(CacheConfig{
+		RGCacheSize:      100,
+		ResCacheSize:     500,
+		FullResCacheSize: 500,
+	})
+	subID := "test-sub"
+
+	// First call should succeed (not already loading)
+	if !cache.TryStartRGLoading(subID) {
+		t.Error("First TryStartRGLoading should return true")
+	}
+
+	// Verify it's marked as loading
+	if !cache.IsRGLoading(subID) {
+		t.Error("Should be loading after TryStartRGLoading")
+	}
+
+	// Second call should fail (already loading)
+	if cache.TryStartRGLoading(subID) {
+		t.Error("Second TryStartRGLoading should return false when already loading")
+	}
+
+	// Clear loading
+	cache.SetRGLoading(subID, false)
+
+	// Now should succeed again
+	if !cache.TryStartRGLoading(subID) {
+		t.Error("TryStartRGLoading should return true after clearing")
+	}
+}
+
+func TestPreloadCache_TryStartResLoading(t *testing.T) {
+	cache := NewPreloadCacheWithConfig(CacheConfig{
+		RGCacheSize:      100,
+		ResCacheSize:     500,
+		FullResCacheSize: 500,
+	})
+	subID := "test-sub"
+	rgName := "test-rg"
+
+	// First call should succeed (not already loading)
+	if !cache.TryStartResLoading(subID, rgName) {
+		t.Error("First TryStartResLoading should return true")
+	}
+
+	// Verify it's marked as loading
+	if !cache.IsResLoading(subID, rgName) {
+		t.Error("Should be loading after TryStartResLoading")
+	}
+
+	// Second call should fail (already loading)
+	if cache.TryStartResLoading(subID, rgName) {
+		t.Error("Second TryStartResLoading should return false when already loading")
+	}
+
+	// Clear loading
+	cache.SetResLoading(subID, rgName, false)
+
+	// Now should succeed again
+	if !cache.TryStartResLoading(subID, rgName) {
+		t.Error("TryStartResLoading should return true after clearing")
+	}
+}
+
+func TestPreloadCache_TryStartFullResLoading(t *testing.T) {
+	cache := NewPreloadCacheWithConfig(CacheConfig{
+		RGCacheSize:      100,
+		ResCacheSize:     500,
+		FullResCacheSize: 500,
+	})
+	resourceID := "/subscriptions/test-sub/resourceGroups/test-rg/providers/Microsoft.Compute/virtualMachines/test-vm"
+
+	// First call should succeed (not already loading)
+	if !cache.TryStartFullResLoading(resourceID) {
+		t.Error("First TryStartFullResLoading should return true")
+	}
+
+	// Verify it's marked as loading
+	if !cache.IsFullResLoading(resourceID) {
+		t.Error("Should be loading after TryStartFullResLoading")
+	}
+
+	// Second call should fail (already loading)
+	if cache.TryStartFullResLoading(resourceID) {
+		t.Error("Second TryStartFullResLoading should return false when already loading")
+	}
+
+	// Clear loading
+	cache.SetFullResLoading(resourceID, false)
+
+	// Now should succeed again
+	if !cache.TryStartFullResLoading(resourceID) {
+		t.Error("TryStartFullResLoading should return true after clearing")
+	}
+}
+
+func TestPreloadCache_TryStartRGLoading_Concurrent(t *testing.T) {
+	cache := NewPreloadCacheWithConfig(CacheConfig{
+		RGCacheSize:      100,
+		ResCacheSize:     500,
+		FullResCacheSize: 500,
+	})
+	subID := "test-sub"
+
+	var wg sync.WaitGroup
+	successCount := 0
+	var mu sync.Mutex
+
+	// Launch 100 goroutines all trying to start loading
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if cache.TryStartRGLoading(subID) {
+				mu.Lock()
+				successCount++
+				mu.Unlock()
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	// Only one goroutine should have succeeded
+	if successCount != 1 {
+		t.Errorf("Expected exactly 1 successful TryStartRGLoading, got %d", successCount)
+	}
+
+	// Should be marked as loading
+	if !cache.IsRGLoading(subID) {
+		t.Error("Should be loading after concurrent TryStartRGLoading")
+	}
+}
+
+func TestPreloadCache_TryStartResLoading_Concurrent(t *testing.T) {
+	cache := NewPreloadCacheWithConfig(CacheConfig{
+		RGCacheSize:      100,
+		ResCacheSize:     500,
+		FullResCacheSize: 500,
+	})
+	subID := "test-sub"
+	rgName := "test-rg"
+
+	var wg sync.WaitGroup
+	successCount := 0
+	var mu sync.Mutex
+
+	// Launch 100 goroutines all trying to start loading
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if cache.TryStartResLoading(subID, rgName) {
+				mu.Lock()
+				successCount++
+				mu.Unlock()
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	// Only one goroutine should have succeeded
+	if successCount != 1 {
+		t.Errorf("Expected exactly 1 successful TryStartResLoading, got %d", successCount)
+	}
+
+	// Should be marked as loading
+	if !cache.IsResLoading(subID, rgName) {
+		t.Error("Should be loading after concurrent TryStartResLoading")
 	}
 }

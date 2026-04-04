@@ -3803,14 +3803,11 @@ func (gui *Gui) preloadResourceGroups(subscriptionID string) {
 		return
 	}
 
-	// Check if already loading
-	if gui.preloadCache.IsRGLoading(subscriptionID) {
+	// Try to start loading - returns false if another goroutine is already loading
+	if !gui.preloadCache.TryStartRGLoading(subscriptionID) {
 		utils.Log("preloadResourceGroups: Already in progress, skipping")
 		return
 	}
-
-	// Mark as loading
-	gui.preloadCache.SetRGLoading(subscriptionID, true)
 
 	utils.Log("preloadResourceGroups: Starting preload")
 
@@ -3888,14 +3885,11 @@ func (gui *Gui) preloadTopResources(subscriptionID string, rgs []*domain.Resourc
 			continue
 		}
 
-		// Check if already loading
-		if gui.preloadCache.IsResLoading(subscriptionID, rgName) {
+		// Try to start loading - returns false if another goroutine is already loading
+		if !gui.preloadCache.TryStartResLoading(subscriptionID, rgName) {
 			utils.Log("preloadTopResources: Already loading for RG #%d, skipping", i)
 			continue
 		}
-
-		// Mark as loading
-		gui.preloadCache.SetResLoading(subscriptionID, rgName, true)
 
 		// Create context for this preload operation
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

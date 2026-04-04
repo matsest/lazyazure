@@ -328,6 +328,19 @@ func (c *PreloadCache) SetRGLoading(subID string, loading bool) {
 	}
 }
 
+// TryStartRGLoading atomically checks if resource groups are loading and marks them as loading if not.
+// Returns true if it successfully marked them as loading (caller should proceed with loading),
+// or false if they are already being loaded by another goroutine (caller should skip).
+func (c *PreloadCache) TryStartRGLoading(subID string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.rgLoading[subID] {
+		return false
+	}
+	c.rgLoading[subID] = true
+	return true
+}
+
 // IsResLoading checks if resources are currently being loaded for a resource group
 func (c *PreloadCache) IsResLoading(subID, rgName string) bool {
 	c.mu.RLock()
@@ -346,6 +359,20 @@ func (c *PreloadCache) SetResLoading(subID, rgName string, loading bool) {
 	} else {
 		delete(c.resLoading, key)
 	}
+}
+
+// TryStartResLoading atomically checks if resources are loading and marks them as loading if not.
+// Returns true if it successfully marked them as loading (caller should proceed with loading),
+// or false if they are already being loaded by another goroutine (caller should skip).
+func (c *PreloadCache) TryStartResLoading(subID, rgName string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	key := subID + "/" + rgName
+	if c.resLoading[key] {
+		return false
+	}
+	c.resLoading[key] = true
+	return true
 }
 
 // GetFullRes retrieves cached full resource details
@@ -414,6 +441,19 @@ func (c *PreloadCache) SetFullResLoading(resourceID string, loading bool) {
 	} else {
 		delete(c.fullResLoading, resourceID)
 	}
+}
+
+// TryStartFullResLoading atomically checks if full resource details are loading and marks them as loading if not.
+// Returns true if it successfully marked them as loading (caller should proceed with loading),
+// or false if they are already being loaded by another goroutine (caller should skip).
+func (c *PreloadCache) TryStartFullResLoading(resourceID string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.fullResLoading[resourceID] {
+		return false
+	}
+	c.fullResLoading[resourceID] = true
+	return true
 }
 
 // InvalidateSubs clears all cached subscriptions, resource groups, and resources
