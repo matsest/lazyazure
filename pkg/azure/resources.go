@@ -135,6 +135,12 @@ func (c *ResourcesClient) GetResource(ctx context.Context, resourceID string, re
 // parseResourceID parses a resource ID into its components
 func parseResourceID(resourceID string) map[string]string {
 	result := make(map[string]string)
+
+	// Validate resource ID is not empty
+	if resourceID == "" {
+		return result
+	}
+
 	// Resource ID format: /subscriptions/{sub}/resourceGroups/{rg}/providers/{provider}/{type}/{name}
 	// Split by /
 	parts := make([]string, 0)
