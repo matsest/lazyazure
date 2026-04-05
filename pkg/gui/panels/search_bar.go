@@ -1,6 +1,7 @@
 package panels
 
 import (
+	"errors"
 	"strings"
 	"sync"
 
@@ -49,7 +50,7 @@ func (sb *SearchBar) Show() error {
 
 	// Create search view at bottom of screen
 	if v, err := sb.g.SetView("search", 0, maxY-2, maxX-1, maxY, 0); err != nil {
-		if !gocui.IsUnknownView(err) {
+		if !errors.Is(err, gocui.ErrUnknownView) {
 			sb.mu.Unlock()
 			return err
 		}
@@ -89,7 +90,7 @@ func (sb *SearchBar) Hide() error {
 
 	// Delete the search view
 	if err := sb.g.DeleteView("search"); err != nil {
-		if !gocui.IsUnknownView(err) {
+		if !errors.Is(err, gocui.ErrUnknownView) {
 			return err
 		}
 	}

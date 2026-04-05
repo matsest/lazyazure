@@ -10,7 +10,7 @@ require (
 	github.com/alecthomas/chroma/v2 v2.23.1
 	github.com/atotto/clipboard v0.1.4
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/jesseduffield/gocui v0.3.1-0.20240418080333-8cd33929c513
+	github.com/jesseduffield/gocui v0.3.1-0.20260327132312-944dab3bc980
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 )
 
@@ -18,14 +18,13 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.2 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.6.0 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
-	github.com/gdamore/encoding v1.0.0 // indirect
-	github.com/gdamore/tcell/v2 v2.7.4 // indirect
+	github.com/gdamore/encoding v1.0.1 // indirect
+	github.com/gdamore/tcell/v2 v2.13.5 // indirect
 	github.com/go-errors/errors v1.5.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
-	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
-	github.com/mattn/go-runewidth v0.0.15 // indirect
-	github.com/rivo/uniseg v0.4.3 // indirect
+	github.com/lucasb-eyer/go-colorful v1.3.0 // indirect
+	github.com/rivo/uniseg v0.4.7 // indirect
 	golang.org/x/crypto v0.47.0 // indirect
 	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect

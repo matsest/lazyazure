@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -319,7 +320,7 @@ func (gui *Gui) setupViews() error {
 
 	// 1. Auth panel (top, small)
 	if v, err := gui.g.SetView("auth", 0, 0, sidebarWidth-1, authHeight, 0); err != nil {
-		if !gocui.IsUnknownView(err) {
+		if !errors.Is(err, gocui.ErrUnknownView) {
 			return err
 		}
 		v.Title = " Auth "
@@ -333,7 +334,7 @@ func (gui *Gui) setupViews() error {
 	subY0 := authHeight + 1
 	subY1 := subY0 + subHeight
 	if v, err := gui.g.SetView("subscriptions", 0, subY0, sidebarWidth-1, subY1, 0); err != nil {
-		if !gocui.IsUnknownView(err) {
+		if !errors.Is(err, gocui.ErrUnknownView) {
 			return err
 		}
 		v.Title = " Subscriptions "
@@ -350,7 +351,7 @@ func (gui *Gui) setupViews() error {
 	rgY0 := subY1 + 1
 	rgY1 := rgY0 + rgHeight
 	if v, err := gui.g.SetView("resourcegroups", 0, rgY0, sidebarWidth-1, rgY1, 0); err != nil {
-		if !gocui.IsUnknownView(err) {
+		if !errors.Is(err, gocui.ErrUnknownView) {
 			return err
 		}
 		v.Title = " Resource Groups "
@@ -367,7 +368,7 @@ func (gui *Gui) setupViews() error {
 	// Both panels' bottom borders should be at the same Y coordinate
 	resY1 := statusY
 	if v, err := gui.g.SetView("resources", 0, resY0, sidebarWidth-1, resY1, 0); err != nil {
-		if !gocui.IsUnknownView(err) {
+		if !errors.Is(err, gocui.ErrUnknownView) {
 			return err
 		}
 		v.Title = " Resources "
@@ -380,7 +381,7 @@ func (gui *Gui) setupViews() error {
 
 	// 5. Main panel (right side)
 	if v, err := gui.g.SetView("main", rightX0, 0, maxX-1, statusY, 0); err != nil {
-		if !gocui.IsUnknownView(err) {
+		if !errors.Is(err, gocui.ErrUnknownView) {
 			return err
 		}
 		// Use gocui's native tab support instead of title
@@ -407,7 +408,7 @@ func (gui *Gui) setupViews() error {
 
 	// 6. Status bar (bottom)
 	if v, err := gui.g.SetView("status", 0, statusY, maxX-1, maxY, 0); err != nil {
-		if !gocui.IsUnknownView(err) {
+		if !errors.Is(err, gocui.ErrUnknownView) {
 			return err
 		}
 		v.BgColor = gocui.ColorDefault
