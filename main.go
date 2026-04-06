@@ -10,10 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jesseduffield/gocui"
+	tea "charm.land/bubbletea/v2"
 	"github.com/matsest/lazyazure/pkg/azure"
 	"github.com/matsest/lazyazure/pkg/demo"
 	"github.com/matsest/lazyazure/pkg/gui"
+	"github.com/matsest/lazyazure/pkg/tui"
 	"github.com/matsest/lazyazure/pkg/utils"
 )
 
@@ -267,34 +268,21 @@ func runApp(version, commit, date string) int {
 		clientFactory = azure.NewClientFactory(client)
 	}
 
-	// Create and run GUI
+	// Create and run TUI
 	versionInfo := gui.VersionInfo{
 		Version: version,
 		Commit:  commit,
 		Date:    date,
 	}
-	g, err := gui.NewGui(azureClient, clientFactory, versionInfo)
-	if err != nil {
-		utils.Log("ERROR: Failed to create GUI: %v", err)
-		fmt.Fprintf(os.Stderr, "Failed to create GUI: %v\n", err)
+
+	m := tui.NewModel(azureClient, clientFactory, versionInfo)
+	p := tea.NewProgram(m)
+
+	utils.Log("Starting TUI main loop...")
+	if _, err := p.Run(); err != nil {
+		utils.Log("ERROR: TUI error: %v", err)
+		fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)
 		return 1
-	}
-	utils.Log("GUI created successfully")
-
-	utils.Log("Starting GUI main loop...")
-	runErr := g.Run()
-	utils.Log("GUI Run returned: %v", runErr)
-
-	// Check if it's a quit error - gocui.ErrQuit or any error containing "quit"
-	if runErr != nil {
-		if runErr.Error() == "quit" || runErr.Error() == gocui.ErrQuit.Error() {
-			utils.Log("Normal quit - exiting cleanly")
-			return 0
-		} else {
-			utils.Log("ERROR: GUI error: %v", runErr)
-			fmt.Fprintf(os.Stderr, "GUI error: %v\n", runErr)
-			return 1
-		}
 	}
 
 	utils.Log("Application exiting normally")
