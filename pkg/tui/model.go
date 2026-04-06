@@ -326,6 +326,16 @@ func (m *Model) handleGlobalKeys(msg tea.KeyMsg) (bool, tea.Cmd) {
 			m.clearVersionDisplay()
 			return true, nil
 		}
+
+	case "[":
+		m.mainPanel.PrevTab()
+		m.clearMainPanelSearch()
+		return true, nil
+
+	case "]":
+		m.mainPanel.NextTab()
+		m.clearMainPanelSearch()
+		return true, nil
 	}
 
 	return false, nil
@@ -442,12 +452,6 @@ func (m *Model) handleMainPanelKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mainPanel.ScrollTop()
 	case "end", "G":
 		m.mainPanel.ScrollBottom()
-	case "[":
-		m.mainPanel.PrevTab()
-		m.clearMainPanelSearch()
-	case "]":
-		m.mainPanel.NextTab()
-		m.clearMainPanelSearch()
 	case "/":
 		if !m.searchingMain {
 			m.startMainPanelSearch()

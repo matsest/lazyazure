@@ -16,8 +16,6 @@ const (
 	JSONTab
 )
 
-var tabNames = []string{"Summary", "JSON"}
-
 // MainPanel is the details panel with Summary/JSON tabs
 type MainPanel struct {
 	viewport    viewport.Model
@@ -44,9 +42,8 @@ func NewMainPanel() *MainPanel {
 func (mp *MainPanel) SetSize(width, height int) {
 	mp.width = width
 	mp.height = height
-	// Account for tab bar (1 line) and borders
 	mp.viewport.Width = width - 2
-	mp.viewport.Height = height - 3
+	mp.viewport.Height = height - 2
 }
 
 // SetActive sets whether this panel is currently focused
@@ -160,8 +157,6 @@ func (mp *MainPanel) SetHighlightedContent(lines []string) {
 
 // GotoLine scrolls to make the specified line visible
 func (mp *MainPanel) GotoLine(lineNum int) {
-	// viewport.YOffset is the top visible line
-	// We want to center the match if possible
 	visibleLines := mp.viewport.Height
 	halfVisible := visibleLines / 2
 
@@ -201,82 +196,48 @@ func (mp *MainPanel) Update(msg tea.Msg) (*MainPanel, tea.Cmd) {
 	return mp, cmd
 }
 
-// tabBorderWithBottom creates a custom border for tabs
-func tabBorderWithBottom(left, middle, right string) lipgloss.Border {
-	border := lipgloss.RoundedBorder()
-	border.BottomLeft = left
-	border.Bottom = middle
-	border.BottomRight = right
-	return border
-}
-
-// View renders the main panel with nice tabs
+// View renders the main panel with tabs in the border title
 func (mp *MainPanel) View() string {
-	// Get the border color based on active state
-	borderColor := BorderColorInactive
+	styles := NewStyles()
+
+	// Determine border style
+	panelStyle := styles.InactivePanel
 	if mp.active {
-		borderColor = BorderColorActive
+		panelStyle = styles.ActivePanel
 	}
 
-	// Create tab styles
-	inactiveTabBorder := tabBorderWithBottom("┴", "─", "┴")
-	activeTabBorder := tabBorderWithBottom("┘", " ", "└")
-
-	inactiveTabStyle := lipgloss.NewStyle().
-		Border(inactiveTabBorder).
-		BorderForeground(borderColor).
-		Padding(0, 1).
-		Foreground(WhiteColor)
-
-	activeTabStyle := inactiveTabStyle.
-		Border(activeTabBorder).
-		Foreground(GreenColor).
-		Bold(true)
-
-	// Content window style - no top border to connect with tabs
-	windowStyle := lipgloss.NewStyle().
-		BorderForeground(borderColor).
-		Border(lipgloss.RoundedBorder()).
-		UnsetBorderTop().
-		Width(mp.width).
-		Height(mp.height - 1) // Account for tab row
-
-	// Render tabs
-	var renderedTabs []string
-	for i, name := range tabNames {
-		var style lipgloss.Style
-		isFirst, isLast, isActive := i == 0, i == len(tabNames)-1, Tab(i) == mp.tab
-
-		if isActive {
-			style = activeTabStyle
-		} else {
-			style = inactiveTabStyle
-		}
-
-		border, _, _, _, _ := style.GetBorder()
-		if isFirst && isActive {
-			border.BottomLeft = "│"
-		} else if isFirst && !isActive {
-			border.BottomLeft = "├"
-		} else if isLast && isActive {
-			border.BottomRight = "│"
-		} else if isLast && !isActive {
-			border.BottomRight = "┤"
-		}
-		style = style.Border(border)
-
-		renderedTabs = append(renderedTabs, style.Render(name))
-	}
-
-	// Join tabs horizontally
-	tabsRow := lipgloss.JoinHorizontal(lipgloss.Top, renderedTabs...)
+	// Create tab-style title: Summary | JSON with active tab highlighted
+	tabTitle := mp.renderTabTitle()
 
 	// Get viewport content
 	content := mp.viewport.View()
 
-	// Render content window with matching width
-	contentWindow := windowStyle.Width(lipgloss.Width(tabsRow)).Render(content)
+	// Apply size and render
+	rendered := panelStyle.
+		Width(mp.width).
+		Height(mp.height).
+		Render(content)
 
-	// Combine tabs and content
-	return lipgloss.JoinVertical(lipgloss.Left, tabsRow, contentWindow)
+	// Embed the tab title in the border
+	return EmbedBorderTitle(rendered, tabTitle)
+}
+
+// renderTabTitle creates the tab title string with styling
+func (mp *MainPanel) renderTabTitle() string {
+	separatorStyle := lipgloss.NewStyle().Foreground(GrayColor)
+	inactiveStyle := lipgloss.NewStyle().Foreground(WhiteColor)
+	activeStyle := lipgloss.NewStyle().Foreground(GreenColor).Bold(true)
+
+	separator := separatorStyle.Render(" | ")
+
+	var summaryTab, jsonTab string
+	if mp.tab == SummaryTab {
+		summaryTab = activeStyle.Render("Summary")
+		jsonTab = inactiveStyle.Render("JSON")
+	} else {
+		summaryTab = inactiveStyle.Render("Summary")
+		jsonTab = activeStyle.Render("JSON")
+	}
+
+	return summaryTab + separator + jsonTab
 }
