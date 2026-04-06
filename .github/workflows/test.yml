@@ -4,20 +4,18 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'main.go'
-      - 'go.mod'
-      - 'go.sum'
-      - 'pkg/**'
-      - 'scripts/**'
+      - '**/*.go'
+      - '**/go.mod'
+      - '**/go.sum'
+      - '**/*.sh'
       - '.github/workflows/test.yml'
   pull_request:
     branches: [ main ]
     paths:
-      - 'main.go'
-      - 'go.mod'
-      - 'go.sum'
-      - 'pkg/**'
-      - 'scripts/**'
+      - '**/*.go'
+      - '**/go.mod'
+      - '**/go.sum'
+      - '**/*.sh'
       - '.github/workflows/test.yml'
 
 permissions:
