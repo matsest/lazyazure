@@ -188,8 +188,9 @@ func (lp *ListPanel[T]) View() string {
 	}
 
 	// Apply size
-	contentWidth := lp.width - 4   // Account for borders and padding
-	contentHeight := lp.height - 4 // Account for borders and padding
+	// Account for borders (2 lines vertically, 2 chars horizontally)
+	contentWidth := lp.width - 2
+	contentHeight := lp.height - 2
 	panelStyle = panelStyle.Width(lp.width).Height(lp.height)
 
 	// Build content

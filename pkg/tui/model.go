@@ -40,10 +40,8 @@ type Model struct {
 	height int
 
 	// Panel dimensions (calculated on resize)
-	sidebarWidth  int
-	sidebarHeight int
-	mainWidth     int
-	mainHeight    int
+	sidebarWidth int
+	mainWidth    int
 
 	// UI Components
 	subListPanel *components.ListPanel[*domain.Subscription]
@@ -182,33 +180,46 @@ func (m *Model) calculateLayout() {
 	if m.sidebarWidth < 30 {
 		m.sidebarWidth = 30
 	}
+	// Main panel takes remaining width
 	m.mainWidth = m.width - m.sidebarWidth
 
-	// Status bar is 1 line
-	m.sidebarHeight = m.height - 1
-	m.mainHeight = m.height - 1
+	// Calculate available height for panels (excluding status bar and border overhead)
+	// The -9 accounts for: 1 status bar + 8 border lines (2 per panel × 4 panels in sidebar)
+	availableHeight := m.height - 9
+	if availableHeight < 15 {
+		availableHeight = 15
+	}
 
-	// Update component sizes
-	m.updateComponentSizes()
-}
+	// Auth panel: fixed height
+	authHeight := 3
+	listHeight := availableHeight - authHeight
 
-// updateComponentSizes updates all component sizes
-func (m *Model) updateComponentSizes() {
-	// Sidebar panels: auth (3 lines), subs (~20%), RGs (~30%), resources (rest)
-	authHeight := 5 // Auth panel height (including borders and title)
-	remainingHeight := m.sidebarHeight - authHeight
-	subHeight := remainingHeight / 5       // 20%
-	rgHeight := (remainingHeight * 3) / 10 // 30%
-	resHeight := remainingHeight - subHeight - rgHeight
+	// Divide list area proportionally: subs 20%, RGs 30%, resources 50%
+	subHeight := listHeight / 5
+	rgHeight := (listHeight * 3) / 10
+	resHeight := listHeight - subHeight - rgHeight
 
-	m.subListPanel.SetSize(m.sidebarWidth, subHeight)
-	m.rgListPanel.SetSize(m.sidebarWidth, rgHeight)
-	m.resListPanel.SetSize(m.sidebarWidth, resHeight)
+	// Ensure minimum panel heights
+	if subHeight < 3 {
+		subHeight = 3
+	}
+	if rgHeight < 3 {
+		rgHeight = 3
+	}
+	if resHeight < 3 {
+		resHeight = 3
+	}
 
-	// Main panel
-	m.mainPanel.SetSize(m.mainWidth, m.mainHeight)
+	// Update all panel sizes
+	m.subListPanel.SetSize(m.sidebarWidth-2, subHeight)
+	m.rgListPanel.SetSize(m.sidebarWidth-2, rgHeight)
+	m.resListPanel.SetSize(m.sidebarWidth-2, resHeight)
 
-	// Status bar
+	// Main panel height should match sidebar exactly
+	// sidebar = auth + sub + rg + res (each panel renders with its own borders)
+	// Add +6 for lipgloss border alignment when rendering separately
+	sidebarHeight := authHeight + subHeight + rgHeight + resHeight
+	m.mainPanel.SetSize(m.mainWidth-2, sidebarHeight+6)
 	m.statusBar.SetSize(m.width)
 }
 
@@ -357,6 +368,8 @@ func (m *Model) View() string {
 
 // renderAuthPanel renders the authentication status panel
 func (m *Model) renderAuthPanel() string {
+	styles := components.NewStyles()
+
 	// Simple auth panel - will be enhanced in Phase 4
 	var content string
 	if m.azureClient != nil {
@@ -367,7 +380,10 @@ func (m *Model) renderAuthPanel() string {
 		content = "Auth\nAuthenticating..."
 	}
 
-	return content
+	return styles.AuthPanel.
+		Width(m.sidebarWidth - 2).
+		Height(3).
+		Render(content)
 }
 
 // SetSubscriptionData sets the subscription data

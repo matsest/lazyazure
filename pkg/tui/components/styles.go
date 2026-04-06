@@ -50,14 +50,12 @@ func NewStyles() Styles {
 		// Active panel has green border
 		ActivePanel: lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(BorderColorActive).
-			Padding(0, 1),
+			BorderForeground(BorderColorActive),
 
 		// Inactive panel has white border
 		InactivePanel: lipgloss.NewStyle().
 			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(BorderColorInactive).
-			Padding(0, 1),
+			BorderForeground(BorderColorInactive),
 
 		// List item styles
 		ListItem:         lipgloss.NewStyle(),
