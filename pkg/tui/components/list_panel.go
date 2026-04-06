@@ -261,5 +261,5 @@ func (lp *ListPanel[T]) View() string {
 
 	// Render the panel and embed the title in the border
 	rendered := panelStyle.Render(content.String())
-	return EmbedBorderTitle(rendered, lp.title)
+	return EmbedBorderTitle(rendered, lp.title, lp.active)
 }

@@ -130,7 +130,7 @@ func FormatWithGraySuffix(name, suffix string) string {
 // EmbedBorderTitle embeds a title into the top border line of a rendered box.
 // This creates a gocui-style inline title that sits on the border itself,
 // saving one line of vertical space compared to rendering the title inside.
-func EmbedBorderTitle(renderedBox string, title string) string {
+func EmbedBorderTitle(renderedBox string, title string, active bool) string {
 	lines := []string{}
 	currentLine := ""
 	for _, r := range renderedBox {
@@ -161,44 +161,30 @@ func EmbedBorderTitle(renderedBox string, title string) string {
 		leftBorderChar := string(strippedRunes[0])
 		rightBorderChar := string(strippedRunes[len(strippedRunes)-1])
 
-		// Calculate inner width (between border chars)
-		innerWidth := len(strippedRunes) - 2
+		// Calculate inner width (between border chars) using lipgloss for proper ANSI handling
+		innerWidth := lipgloss.Width(stripped) - 2
 
-		// Calculate title dimensions using visible length (stripped of ANSI codes)
-		// but insert the raw title (with ANSI codes) into the border
-		titleStripped := stripANSI(title)
-		titleWithSpacesVisible := " " + titleStripped + " "
+		// Calculate title dimensions using lipgloss.Width for proper ANSI handling
 		titleWithSpacesRaw := " " + title + " "
+		titleVisualWidth := lipgloss.Width(titleWithSpacesRaw)
 
-		// Truncate if needed (based on visible length)
-		visibleRunes := []rune(titleWithSpacesVisible)
-		if len(visibleRunes) > innerWidth {
+		// Truncate if needed (based on visual width)
+		if titleVisualWidth > innerWidth {
 			maxLen := innerWidth - 3 // Space for "..."
 			if maxLen < 1 {
 				maxLen = 1
 			}
-			truncated := 0
-			currentWidth := 0
-			for i := range visibleRunes {
-				w := 1 // Simplified width calculation
-				if currentWidth+w > maxLen {
-					truncated = i
-					break
-				}
-				currentWidth += w
-				truncated = i + 1
+			// Simple truncation - just use stripped version with ellipsis
+			titleStripped := stripANSI(title)
+			if len(titleStripped) > maxLen {
+				titleStripped = titleStripped[:maxLen]
 			}
-			// Truncate the raw title to match visible position
-			// This is approximate - proper handling would need to account for ANSI codes
-			visibleRunes = visibleRunes[:truncated]
-			visibleRunes = append(visibleRunes, '.', '.', '.')
-			titleWithSpacesVisible = string(visibleRunes)
-			// For simplicity in truncation case, use the stripped version
-			titleWithSpacesRaw = titleWithSpacesVisible
+			titleWithSpacesRaw = " " + titleStripped + "... "
+			titleVisualWidth = lipgloss.Width(titleWithSpacesRaw)
 		}
 
-		// Calculate filler needed based on visible length
-		fillerCount := innerWidth - len(visibleRunes)
+		// Calculate filler needed based on visual width
+		fillerCount := innerWidth - titleVisualWidth
 		if fillerCount < 0 {
 			fillerCount = 0
 		}
@@ -207,34 +193,21 @@ func EmbedBorderTitle(renderedBox string, title string) string {
 			filler += "─"
 		}
 
-		// Build new top line: preserve any leading ANSI codes, then border + styled title + filler + border
-		newTopContent := leftBorderChar + titleWithSpacesRaw + filler + rightBorderChar
-
-		// We need to preserve any ANSI sequences at the start of the line
-		// Find first visible (non-ANSI) character position
-		ansiEnd := 0
-		inEscape := false
-		for i, r := range firstLine {
-			if inEscape {
-				if r == 'm' {
-					inEscape = false
-				}
-				ansiEnd = i + 1
-			} else if r == '\x1b' {
-				inEscape = true
-				ansiEnd = i
-			} else {
-				break
-			}
+		// Determine border color
+		var borderColorCode string
+		if active {
+			borderColorCode = "\x1b[38;5;120m" // Green
+		} else {
+			borderColorCode = "\x1b[38;5;255m" // White
 		}
 
-		// Extract leading ANSI codes (colors, etc.)
-		leadingANSI := ""
-		if ansiEnd > 0 {
-			leadingANSI = firstLine[:ansiEnd]
-		}
+		// Build new top line: border color before each segment
+		// The title has its own styling (green/white for tabs), so we apply border color before and after
+		newTopContent := borderColorCode + leftBorderChar + "\x1b[0m" +
+			titleWithSpacesRaw +
+			borderColorCode + filler + rightBorderChar + "\x1b[0m"
 
-		lines[0] = leadingANSI + newTopContent
+		lines[0] = newTopContent
 	}
 
 	result := ""

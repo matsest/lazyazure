@@ -65,6 +65,9 @@ type Model struct {
 	searchingMain   bool
 	mainPanelSearch *panels.MainPanelSearch
 
+	// Zone manager for mouse handling
+	zoneMgr *zone.Manager
+
 	// Demo mode
 	isDemo bool
 }
@@ -184,6 +187,9 @@ func NewModel(azureClient gui.AzureClient, clientFactory gui.AzureClientFactory,
 
 	// Initialize main panel search
 	m.mainPanelSearch = panels.NewMainPanelSearch()
+
+	// Initialize zone manager for mouse handling
+	m.zoneMgr = zone.New()
 
 	// Calculate initial layout
 	m.calculateLayout()
@@ -794,26 +800,23 @@ func (m *Model) updateMainPanelHighlightedContent() {
 
 // handleMouse handles mouse events
 func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	// Get the zone manager
-	z := zone.New()
-
-	// Define zone IDs for panels
-	subZoneID := "subscriptions"
-	rgZoneID := "resourcegroups"
-	resZoneID := "resources"
-	mainZoneID := "main"
-
 	switch msg.Type {
 	case tea.MouseLeft:
-		// Check which zone was clicked
-		if z.Get(subZoneID).InBounds(msg) {
+		// Check which zone was clicked using the zone manager
+		if m.zoneMgr.Get("tab-summary").InBounds(msg) {
+			m.mainPanel.SetTab(components.SummaryTab)
+			m.clearMainPanelSearch()
+		} else if m.zoneMgr.Get("tab-json").InBounds(msg) {
+			m.mainPanel.SetTab(components.JSONTab)
+			m.clearMainPanelSearch()
+		} else if m.zoneMgr.Get("subscriptions").InBounds(msg) {
 			m.activePanel = SubscriptionsPanel
 			// TODO: Calculate which item was clicked and select it
-		} else if z.Get(rgZoneID).InBounds(msg) {
+		} else if m.zoneMgr.Get("resourcegroups").InBounds(msg) {
 			m.activePanel = ResourceGroupsPanel
-		} else if z.Get(resZoneID).InBounds(msg) {
+		} else if m.zoneMgr.Get("resources").InBounds(msg) {
 			m.activePanel = ResourcesPanel
-		} else if z.Get(mainZoneID).InBounds(msg) {
+		} else if m.zoneMgr.Get("main").InBounds(msg) {
 			m.activePanel = MainPanel
 		}
 		m.updatePanelStates()
@@ -930,14 +933,11 @@ func (m *Model) updatePanelStates() {
 
 // View implements tea.Model
 func (m *Model) View() string {
-	// Create zone manager
-	z := zone.New()
-
 	// Build sidebar with zone markers
 	authPanel := m.renderAuthPanel()
-	subPanel := z.Mark("subscriptions", m.subListPanel.View())
-	rgPanel := z.Mark("resourcegroups", m.rgListPanel.View())
-	resPanel := z.Mark("resources", m.resListPanel.View())
+	subPanel := m.zoneMgr.Mark("subscriptions", m.subListPanel.View())
+	rgPanel := m.zoneMgr.Mark("resourcegroups", m.rgListPanel.View())
+	resPanel := m.zoneMgr.Mark("resources", m.resListPanel.View())
 
 	sidebar := lipgloss.JoinVertical(
 		lipgloss.Left,
@@ -947,8 +947,8 @@ func (m *Model) View() string {
 		resPanel,
 	)
 
-	// Main panel with zone marker
-	mainPanel := z.Mark("main", m.mainPanel.View())
+	// Main panel with zone marker (tabs are marked inside View)
+	mainPanel := m.zoneMgr.Mark("main", m.mainPanel.View(m.zoneMgr))
 
 	// Combine sidebar and main panel horizontally
 	content := lipgloss.JoinHorizontal(
@@ -965,12 +965,14 @@ func (m *Model) View() string {
 		status = m.statusBar.View()
 	}
 
-	// Final layout
-	return lipgloss.JoinVertical(
+	// Final layout - scan with zone manager to enable mouse detection
+	output := lipgloss.JoinVertical(
 		lipgloss.Left,
 		content,
 		status,
 	)
+
+	return m.zoneMgr.Scan(output)
 }
 
 // renderSearchBar renders the search input at the bottom
@@ -1009,7 +1011,7 @@ func (m *Model) renderAuthPanel() string {
 		Height(3).
 		Render(content)
 
-	return components.EmbedBorderTitle(rendered, "Auth")
+	return components.EmbedBorderTitle(rendered, "Auth", false)
 }
 
 // SetSubscriptionData sets the subscription data

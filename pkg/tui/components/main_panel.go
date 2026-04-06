@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	zone "github.com/lrstanley/bubblezone"
 )
 
 // Tab represents a tab in the main panel
@@ -197,7 +198,8 @@ func (mp *MainPanel) Update(msg tea.Msg) (*MainPanel, tea.Cmd) {
 }
 
 // View renders the main panel with tabs in the border title
-func (mp *MainPanel) View() string {
+// Returns the rendered view and accepts a zone manager for marking tab zones
+func (mp *MainPanel) View(z *zone.Manager) string {
 	styles := NewStyles()
 
 	// Determine border style
@@ -206,8 +208,41 @@ func (mp *MainPanel) View() string {
 		panelStyle = styles.ActivePanel
 	}
 
-	// Create tab-style title: Summary | JSON with active tab highlighted
-	tabTitle := mp.renderTabTitle()
+	// Create tab buttons that can be clicked
+	var summaryTab, jsonTab string
+	if mp.tab == SummaryTab {
+		summaryTab = lipgloss.NewStyle().
+			Foreground(GreenColor).
+			Bold(true).
+			Padding(0, 1).
+			Render("Summary")
+		jsonTab = lipgloss.NewStyle().
+			Foreground(WhiteColor).
+			Padding(0, 1).
+			Render("JSON")
+	} else {
+		summaryTab = lipgloss.NewStyle().
+			Foreground(WhiteColor).
+			Padding(0, 1).
+			Render("Summary")
+		jsonTab = lipgloss.NewStyle().
+			Foreground(GreenColor).
+			Bold(true).
+			Padding(0, 1).
+			Render("JSON")
+	}
+
+	// Mark tabs as zones if zone manager provided
+	if z != nil {
+		summaryTab = z.Mark("tab-summary", summaryTab)
+		jsonTab = z.Mark("tab-json", jsonTab)
+	}
+
+	// Create separator
+	separator := lipgloss.NewStyle().Foreground(GrayColor).Render(" | ")
+
+	// Build tab title
+	tabTitle := summaryTab + separator + jsonTab
 
 	// Get viewport content
 	content := mp.viewport.View()
@@ -218,8 +253,8 @@ func (mp *MainPanel) View() string {
 		Height(mp.height).
 		Render(content)
 
-	// Embed the tab title in the border
-	return EmbedBorderTitle(rendered, tabTitle)
+	// Embed the tab title in the border with proper color
+	return EmbedBorderTitle(rendered, tabTitle, mp.active)
 }
 
 // renderTabTitle creates the tab title string with styling
