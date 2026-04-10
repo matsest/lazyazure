@@ -59,7 +59,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
-Chroma (github.com/alecthomas/chroma)
+Chroma v2 (github.com/alecthomas/chroma/v2)
 License: MIT License
 Copyright (C) 2017 Alec Thomas
 --------------------------------------------------------------------------------
@@ -345,26 +345,57 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+--------------------------------------------------------------------------------
+go-jwt (github.com/golang-jwt/jwt/v5)
+License: MIT License
+Copyright (c) 2012 Dave Grijalva
+Copyright (c) 2021 golang-jwt maintainers
+--------------------------------------------------------------------------------
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
 ================================================================================
 TRANSITIVE DEPENDENCIES
 ================================================================================
 
 The following packages are included as transitive dependencies:
 
-- golang-jwt/jwt - MIT License (github.com/golang-jwt/jwt)
 - go-colorful - MIT License (github.com/lucasb-eyer/go-colorful)
 - go-runewidth - MIT License (github.com/mattn/go-runewidth)
 - uniseg - MIT License (github.com/rivo/uniseg)
 - google/uuid - BSD 3-Clause License (github.com/google/uuid)
 - golang.org/x/* packages - BSD 3-Clause License (golang.org/x)
+- dlclark/regexp2 - MIT License (github.com/dlclark/regexp2)
+- gdamore/encoding - Apache 2.0 License (github.com/gdamore/encoding)
+- go-errors/errors - MIT License (github.com/go-errors/errors)
+- kylelemons/godebug - Apache 2.0 License (github.com/kylelemons/godebug)
 
 For full license texts of transitive dependencies, please see:
-https://github.com/golang-jwt/jwt/blob/main/LICENSE
 https://github.com/lucasb-eyer/go-colorful/blob/master/LICENSE
 https://github.com/mattn/go-runewidth/blob/master/LICENSE
 https://github.com/rivo/uniseg/blob/master/LICENSE
 https://github.com/google/uuid/blob/master/LICENSE
 https://github.com/golang/go/blob/master/LICENSE
+https://github.com/dlclark/regexp2/blob/master/LICENSE
+https://github.com/gdamore/encoding/blob/master/LICENSE
+https://github.com/go-errors/errors/blob/master/LICENSE.MIT
+https://github.com/kylelemons/godebug/blob/master/LICENSE
 
 ================================================================================
 END OF THIRD-PARTY NOTICES
