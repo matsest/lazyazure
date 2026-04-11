@@ -74,12 +74,6 @@ Download pre-built binaries for Linux, macOS, and Windows from the [releases pag
 ### Install from Source
 
 ```bash
-go install github.com/matsest/lazyazure@latest
-```
-
-Or clone and build:
-
-```bash
 git clone https://github.com/matsest/lazyazure.git
 cd lazyazure
 make build
