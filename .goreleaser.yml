@@ -91,6 +91,10 @@ release:
 
     ### Linux
     ```bash
+    # Homebrew
+    brew install matsest/tap/lazyazure
+
+    # Binary install (x86)
     curl -LO https://github.com/matsest/lazyazure/releases/download/{{ .Tag }}/lazyazure_{{ .Version }}_linux_amd64
     chmod +x lazyazure_{{ .Version }}_linux_amd64
     mv lazyazure_{{ .Version }}_linux_amd64 ~/.local/bin/lazyazure
