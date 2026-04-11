@@ -19,6 +19,20 @@ builds:
       - -X main.commit={{.Commit}}
       - -X main.date={{.Date}}
 
+brews:
+  - repository:
+      owner: matsest
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/matsest/lazyazure"
+    description: "The lazy way to view your Azure resources. TUI for drilling down into Azure subscriptions, resource groups and resources."
+    license: "MIT"
+    test: |
+      system "#{bin}/lazyazure", "--help"
+    install: |
+      bin.install "lazyazure"
+
 archives:
   - formats: binary
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
@@ -63,10 +77,13 @@ release:
 
     ## Installation
 
-    Download the appropriate binary for your platform below.
+    ### macOS
 
-    ### macOS (Apple Silicon)
     ```bash
+    # Homebrew
+    brew install matsest/tap/lazyazure
+
+    # Binary install (Apple Silicon)
     curl -LO https://github.com/matsest/lazyazure/releases/download/{{ .Tag }}/lazyazure_{{ .Version }}_darwin_arm64
     chmod +x lazyazure_{{ .Version }}_darwin_arm64
     mv lazyazure_{{ .Version }}_darwin_arm64 ~/.local/bin/lazyazure

@@ -63,6 +63,12 @@ See [PLAN.md](./PLAN.md) for implementation details and roadmap.
 
 Download pre-built binaries for Linux, macOS, and Windows from the [releases page](https://github.com/matsest/lazyazure/releases/latest). Each release includes installation instructions specific to that version.
 
+### Install with Homebrew
+
+```bash
+brew install matsest/tap/lazyazure
+```
+
 ### Install from Source
 
 ```bash
