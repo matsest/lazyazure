@@ -5,6 +5,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "tuesday"
+    assignees:
+      - "matsest"
     groups:
       github-actions:
         patterns:
@@ -15,6 +17,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "tuesday"
+    assignees:
+      - "matsest"    
     groups:
       azure-sdk-for-go:
         patterns:
