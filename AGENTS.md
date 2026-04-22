@@ -674,6 +674,7 @@ pkg/
 │   ├── resourcegroups_test.go # RG tests
 │   ├── resources.go         # Generic resource operations
 │   ├── resources_test.go    # Resource client tests
+│   ├── resourcegraph.go     # Azure Resource Graph client for cross-subscription queries
 │   ├── api_versions.go      # Dynamic API version lookup with caching
 │   ├── api_versions_curated.json # Pre-loaded API versions for common types
 │   └── api_versions_test.go # API version cache tests
@@ -702,6 +703,7 @@ pkg/
 │       ├── filtered_list_test.go # Filtered list tests
 │       ├── search_bar.go         # Search bar UI component
 │       ├── search_bar_test.go    # Search bar tests
+│       ├── type_picker.go        # Type filter modal with fuzzy search
 │       ├── main_panel_search.go  # Main panel search (highlighting)
 │       └── main_panel_search_test.go # Main panel search tests
 ├── tasks/          # Async task management
@@ -879,6 +881,122 @@ if gui.mainPanelSearch.IsActive() {
 - `N` - Jump to previous match
 - `Enter` - Confirm and exit search input mode
 - `Escape` - Clear search and remove highlights
+
+### Type Picker (Resource Type Filtering)
+
+The type picker allows filtering resources by type using a modal with fuzzy search.
+
+#### Implementation (`pkg/gui/panels/type_picker.go`)
+
+**Architecture:**
+- Modal overlay that appears on top of the resources panel
+- Uses `display_names.json` for the list of known resource types
+- Fuzzy search filters types as user types
+- First option is always `[Clear filter]` to remove the active filter
+
+**Key Features:**
+- Case-insensitive fuzzy matching (matches anywhere in type name)
+- Shows both display name and Azure type (e.g., "Virtual Machine (Microsoft.Compute/virtualMachines)")
+- Scrollable list with cursor navigation
+- Server-side filtering via Azure Resource Graph when querying
+
+**Keybindings:**
+- `T` (in subscriptions or resources panel) - Open type picker
+- `↑/↓` or `j/k` - Navigate list
+- Characters - Fuzzy search filter
+- `Backspace` - Delete search character
+- `Enter` - Select type and apply filter
+- `Escape` - Cancel without changing filter
+
+**Note:** Setting a type filter in the subscriptions panel persists to global search (`G`) and subscription view (`A`). The filter is applied server-side via Azure Resource Graph for these cross-subscription queries.
+
+**Integration:**
+```go
+// In GUI
+gui.typePicker = panels.NewTypePicker(g, gui.onTypeSelected, gui.onTypePickerCancel)
+
+// Show picker
+gui.typePicker.Show()
+
+// Apply filter in onTypeSelected callback
+gui.activeTypeFilter = selectedType
+gui.applyTypeFilter()
+```
+
+### Subscription-Level Resource Viewing
+
+Allows viewing all resources in a subscription without selecting a specific resource group.
+
+**Activation:**
+- Press `A` in the subscriptions panel to view all resources in the selected subscription
+- Uses Azure Resource Graph for efficient cross-RG queries
+
+**Display Format:**
+- Resources show: `name (rg-name / Type)`
+- Panel title shows: "All Subscription Resources"
+- Status bar shows context about the view mode
+
+**State Management:**
+- `gui.subscriptionViewMode` boolean tracks if in this mode
+- `Escape` exits the mode and returns to normal navigation
+- Selecting a different subscription or RG clears the mode
+
+**Implementation:**
+```go
+// Enter subscription view mode
+gui.subscriptionViewMode = true
+gui.loadSubscriptionResources(subID)
+
+// Exit mode
+gui.exitSubscriptionViewMode()
+```
+
+### Cross-Subscription Global Search
+
+Enables searching for resources across ALL subscriptions using Azure Resource Graph.
+
+**Activation:**
+- Press `G` in the subscriptions panel to start global search
+- Opens search bar at bottom for entering query
+- Type query and press Enter to execute search
+- Uses Azure Resource Graph KQL for efficient queries
+
+**Display Format:**
+- Results show: `name (sub-name / rg-name / Type)`
+- Panel title shows: "Global Search Results: <query>"
+- Supports viewing details of resources from any subscription
+
+**Key Features:**
+- Search executes when Enter is pressed (not on every keystroke)
+- Searches across resource name, type, and resource group name
+- Respects active type filter if set (set with `T` before or during search)
+- Background execution with loading indicator
+
+**Keybindings:**
+- `G` (in subscriptions panel) - Start global search
+- Characters - Type search query
+- `Enter` - Execute search
+- `Escape` - Cancel and exit global search mode
+- `T` (after search) - Change type filter and re-run search
+
+**Implementation:**
+```go
+// ResourceGraphClient interface
+type ResourceGraphClient interface {
+    QueryResources(ctx context.Context, subscriptionIDs []string, query string) ([]*domain.Resource, error)
+}
+
+// Usage
+resources, err := gui.resourceGraphClient.QueryResources(ctx, subIDs, kqlQuery)
+```
+
+**KQL Query Pattern:**
+```kql
+Resources
+| where name contains 'searchterm' or type contains 'searchterm' or resourceGroup contains 'searchterm'
+| project id, name, type, location, resourceGroup, subscriptionId, tags, properties
+| limit 500
+```
 
 ### Resource Type Display Names
 
