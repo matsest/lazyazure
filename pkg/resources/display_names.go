@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -203,4 +204,30 @@ func extractProviderName(provider string) string {
 	formatted := formatWords(words)
 
 	return strings.Join(formatted, " ")
+}
+
+// ResourceTypeEntry represents a resource type with its display name
+type ResourceTypeEntry struct {
+	FullType    string // e.g., "Microsoft.Compute/virtualMachines"
+	DisplayName string // e.g., "Virtual Machine"
+}
+
+// GetAllResourceTypes returns all known resource types sorted by display name
+// This is used for type picker/filter UI
+func GetAllResourceTypes() []ResourceTypeEntry {
+	entries := make([]ResourceTypeEntry, 0, len(displayNames))
+
+	for fullType, displayName := range displayNames {
+		entries = append(entries, ResourceTypeEntry{
+			FullType:    fullType,
+			DisplayName: displayName,
+		})
+	}
+
+	// Sort by display name for consistent UI
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].DisplayName < entries[j].DisplayName
+	})
+
+	return entries
 }

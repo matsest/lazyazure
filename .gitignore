@@ -48,3 +48,6 @@ index.json
 
 # Working/development notes (not for commit)
 .scratch/
+
+# AI tool
+.opencode/package-lock.json

@@ -109,6 +109,11 @@ func (c *Client) NewResourcesClient(subscriptionID string) (gui.ResourcesClient,
 	return NewDemoResourcesClient(c, subscriptionID), nil
 }
 
+// NewResourceGraphClient creates a resource graph client for cross-subscription queries
+func (c *Client) NewResourceGraphClient() (gui.ResourceGraphClient, error) {
+	return NewDemoResourceGraphClient(c.data), nil
+}
+
 // DemoSubscriptionsClient wraps demo data for subscriptions
 type DemoSubscriptionsClient struct {
 	data *DemoData
@@ -244,6 +249,146 @@ func (c *DemoResourcesClient) GetResource(ctx context.Context, resourceID string
 	}
 }
 
+// DemoResourceGraphClient provides cross-subscription queries for demo data
+type DemoResourceGraphClient struct {
+	data *DemoData
+}
+
+// NewDemoResourceGraphClient creates a new demo resource graph client
+func NewDemoResourceGraphClient(data *DemoData) *DemoResourceGraphClient {
+	return &DemoResourceGraphClient{data: data}
+}
+
+// SearchResources searches for resources across all demo subscriptions
+func (c *DemoResourceGraphClient) SearchResources(ctx context.Context, nameFilter, typeFilter string, subscriptionIDs []string) ([]*domain.Resource, error) {
+	simulateDelay(100, 300)
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
+	var results []*domain.Resource
+
+	// Get all resources from all subscriptions
+	for rgName, resources := range c.data.Resources {
+		for _, res := range resources {
+			// Check subscription filter
+			if len(subscriptionIDs) > 0 && !containsString(subscriptionIDs, res.SubscriptionID) {
+				continue
+			}
+
+			// Check name filter (case-insensitive contains)
+			if nameFilter != "" && !containsIgnoreCase(res.Name, nameFilter) {
+				continue
+			}
+
+			// Check type filter (case-insensitive exact match)
+			if typeFilter != "" && !equalsIgnoreCase(res.Type, typeFilter) {
+				continue
+			}
+
+			// Create a copy with resource group info
+			resCopy := &domain.Resource{
+				ID:             res.ID,
+				Name:           res.Name,
+				Type:           res.Type,
+				Location:       res.Location,
+				ResourceGroup:  rgName,
+				SubscriptionID: res.SubscriptionID,
+				Tags:           res.Tags,
+				CreatedTime:    res.CreatedTime,
+				ChangedTime:    res.ChangedTime,
+			}
+			results = append(results, resCopy)
+		}
+	}
+
+	return results, nil
+}
+
+// ListResourcesBySubscription lists all resources in a subscription
+func (c *DemoResourceGraphClient) ListResourcesBySubscription(ctx context.Context, subscriptionID string) ([]*domain.Resource, error) {
+	return c.SearchResources(ctx, "", "", []string{subscriptionID})
+}
+
+// ListResourcesByType lists resources of a specific type
+func (c *DemoResourceGraphClient) ListResourcesByType(ctx context.Context, resourceType string, subscriptionIDs []string) ([]*domain.Resource, error) {
+	return c.SearchResources(ctx, "", resourceType, subscriptionIDs)
+}
+
+// GetDistinctResourceTypes returns all distinct resource types in demo data
+func (c *DemoResourceGraphClient) GetDistinctResourceTypes(ctx context.Context, subscriptionIDs []string) ([]string, error) {
+	simulateDelay(50, 100)
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
+	typeSet := make(map[string]bool)
+
+	for _, resources := range c.data.Resources {
+		for _, res := range resources {
+			// Check subscription filter
+			if len(subscriptionIDs) > 0 && !containsString(subscriptionIDs, res.SubscriptionID) {
+				continue
+			}
+			typeSet[res.Type] = true
+		}
+	}
+
+	types := make([]string, 0, len(typeSet))
+	for t := range typeSet {
+		types = append(types, t)
+	}
+
+	return types, nil
+}
+
+// Helper functions for string matching
+func containsString(slice []string, s string) bool {
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+	}
+	return false
+}
+
+func containsIgnoreCase(s, substr string) bool {
+	s = toLower(s)
+	substr = toLower(substr)
+	return len(s) >= len(substr) && findSubstring(s, substr) >= 0
+}
+
+func equalsIgnoreCase(a, b string) bool {
+	return toLower(a) == toLower(b)
+}
+
+func toLower(s string) string {
+	result := make([]byte, len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		result[i] = c
+	}
+	return string(result)
+}
+
+func findSubstring(s, substr string) int {
+	for i := 0; i+len(substr) <= len(s); i++ {
+		if s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
+}
+
 // simulateDelay sleeps for a random duration between min and max milliseconds
 // to simulate realistic API response times
 func simulateDelay(minMs, maxMs int) {
@@ -274,4 +419,11 @@ var (
 		ListResourcesByResourceGroup(ctx context.Context, resourceGroupName string) ([]*domain.Resource, error)
 		GetResource(ctx context.Context, resourceID string, resourceType string) (*domain.Resource, error)
 	} = (*DemoResourcesClient)(nil)
+
+	_ interface {
+		SearchResources(ctx context.Context, nameFilter, typeFilter string, subscriptionIDs []string) ([]*domain.Resource, error)
+		ListResourcesBySubscription(ctx context.Context, subscriptionID string) ([]*domain.Resource, error)
+		ListResourcesByType(ctx context.Context, resourceType string, subscriptionIDs []string) ([]*domain.Resource, error)
+		GetDistinctResourceTypes(ctx context.Context, subscriptionIDs []string) ([]string, error)
+	} = (*DemoResourceGraphClient)(nil)
 )

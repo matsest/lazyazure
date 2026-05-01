@@ -35,6 +35,9 @@ gifsicle --resize-width 1000 --optimize=3 --colors=128 -o demo_optimized.gif dem
   - Visual focus indicators (green border on active panel)
   - Mouse support (click, scrolling)
 - **Search & Filter**: Real-time search with `/` key across all panels (matches displayed text including suffixes)
+- **Resource Type Filtering**: Press `T` to filter resources by type using a fuzzy-search modal picker
+- **Cross-Subscription Search**: Press `G` to search for resources across all subscriptions using Azure Resource Graph
+- **Subscription-Level View**: Press `A` to view all resources in a subscription without selecting a resource group
 - **Open portal link**: Open portal link to subscription, resource group or resource in browser
 - **Copy portal link**: Copy link to subscription, resource group or resource to clipboard
 - **Smart Resource Loading**: Fetches full resource details with provider-specific API versions
@@ -149,6 +152,12 @@ Note: Development builds (e.g., `dev`, `-dirty`, or commits ahead of a tag) skip
 - **Ctrl+W**: Delete last word
 - **Enter**: Confirm search and exit search mode
 - **Escape**: Cancel search and clear filter
+
+**Advanced Search & Filtering:**
+- **T** (in subscriptions or resources panel): Open type picker to filter resources by type (fuzzy search supported)
+- **G** (in subscriptions panel): Start global search across all subscriptions (respects active type filter)
+- **A** (in subscriptions panel): View all resources in the selected subscription (without selecting a resource group)
+- **Escape**: Exit global search mode or subscription view mode
 
 **View Controls:**
 - **[ and ]**: Switch between Summary and JSON tabs
@@ -278,6 +287,7 @@ See [PLAN.md](./PLAN.md) for the full implementation roadmap.
   - `azcore` - Core types
   - `armsubscriptions` - Subscription management
   - `armresources` - Resource management
+  - `armresourcegraph` - Cross-subscription resource queries
 
 You can see all dependencies in [dependency graph](https://github.com/matsest/lazyazure/network/dependencies).
 
