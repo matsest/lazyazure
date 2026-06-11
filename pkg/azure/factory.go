@@ -28,3 +28,8 @@ func (f *ClientFactory) NewResourceGroupsClient(subscriptionID string) (gui.Reso
 func (f *ClientFactory) NewResourcesClient(subscriptionID string) (gui.ResourcesClient, error) {
 	return NewResourcesClient(f.client, subscriptionID)
 }
+
+// NewResourceGraphClient creates a resource graph client for cross-subscription queries
+func (f *ClientFactory) NewResourceGraphClient() (gui.ResourceGraphClient, error) {
+	return NewResourceGraphClient(f.client)
+}

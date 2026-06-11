@@ -199,13 +199,14 @@ func (sb *SearchBar) DeleteWord() {
 // Cancel cancels the search and restores previous state
 func (sb *SearchBar) Cancel() {
 	sb.mu.Lock()
-	defer sb.mu.Unlock()
-
 	sb.searchText = ""
 	sb.updateView()
+	onCancel := sb.onCancel
+	sb.mu.Unlock()
 
-	if sb.onCancel != nil {
-		sb.onCancel()
+	// Call callback without lock to avoid deadlock if callback calls Hide()
+	if onCancel != nil {
+		onCancel()
 	}
 	utils.Log("SearchBar: Cancelled")
 }
@@ -213,10 +214,12 @@ func (sb *SearchBar) Cancel() {
 // Confirm confirms the current search
 func (sb *SearchBar) Confirm() {
 	sb.mu.Lock()
-	defer sb.mu.Unlock()
+	onConfirm := sb.onConfirm
+	sb.mu.Unlock()
 
-	if sb.onConfirm != nil {
-		sb.onConfirm()
+	// Call callback without lock to avoid deadlock if callback calls Hide()
+	if onConfirm != nil {
+		onConfirm()
 	}
 	utils.Log("SearchBar: Confirmed")
 }

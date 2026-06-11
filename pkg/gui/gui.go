@@ -19,6 +19,7 @@ import (
 	"github.com/jesseduffield/gocui"
 	"github.com/matsest/lazyazure/pkg/domain"
 	"github.com/matsest/lazyazure/pkg/gui/panels"
+	"github.com/matsest/lazyazure/pkg/resources"
 	"github.com/matsest/lazyazure/pkg/tasks"
 	"github.com/matsest/lazyazure/pkg/utils"
 )
@@ -149,13 +150,14 @@ func (gui *Gui) getLoadingText() string {
 
 // Gui is the main GUI controller
 type Gui struct {
-	g             *gocui.Gui
-	azureClient   AzureClient
-	clientFactory AzureClientFactory
-	subClient     SubscriptionsClient
-	rgClient      ResourceGroupsClient
-	resClient     ResourcesClient
-	taskManager   *tasks.TaskManager
+	g                   *gocui.Gui
+	azureClient         AzureClient
+	clientFactory       AzureClientFactory
+	subClient           SubscriptionsClient
+	rgClient            ResourceGroupsClient
+	resClient           ResourcesClient
+	resourceGraphClient ResourceGraphClient
+	taskManager         *tasks.TaskManager
 
 	// Views - Left sidebar (stacked panels)
 	authView           *gocui.View
@@ -192,6 +194,18 @@ type Gui struct {
 	isSearching     bool
 	searchTarget    string // "list" or "main" - tracks which search mode is active
 	mainPanelSearch *panels.MainPanelSearch
+
+	// Type filter
+	typePicker       *panels.TypePicker
+	activeTypeFilter string // Current type filter (full Azure type string, or "" for none)
+
+	// Global search state (cross-subscription Resource Graph search)
+	globalSearchMode   bool               // True when showing global search results
+	globalSearchQuery  string             // Current global search query
+	globalSearchCancel context.CancelFunc // Cancel function for in-progress search
+
+	// Subscription-level resource view (all resources in a subscription, no RG selected)
+	subscriptionViewMode bool // True when showing all resources in a subscription
 
 	// Version info
 	versionInfo         VersionInfo
@@ -283,6 +297,16 @@ func (gui *Gui) Run() error {
 		return fmt.Errorf("failed to initialize subscription client: %w", err)
 	}
 	gui.subClient = subClient
+
+	// Initialize Resource Graph client (for cross-subscription queries)
+	rgClient, err := gui.clientFactory.NewResourceGraphClient()
+	if err != nil {
+		utils.Log("Gui.Run: WARNING - could not initialize Resource Graph client: %v", err)
+		// Non-fatal - type filtering will still work via client-side filtering
+	} else {
+		gui.resourceGraphClient = rgClient
+		utils.Log("Gui.Run: Resource Graph client initialized")
+	}
 	utils.Log("Gui.Run: Azure clients initialized")
 
 	// Load initial data
@@ -507,6 +531,24 @@ func (gui *Gui) setupKeybindings() error {
 	}
 	utils.Log("setupKeybindings: Subscriptions navigation set")
 
+	// Global search (G) - cross-subscription search using Resource Graph
+	if err := gui.g.SetKeybinding("subscriptions", 'G', gocui.ModNone, gui.startGlobalSearch); err != nil {
+		return err
+	}
+	utils.Log("setupKeybindings: Global search keybinding set")
+
+	// All resources in subscription (A) - view all resources without selecting RG
+	if err := gui.g.SetKeybinding("subscriptions", 'A', gocui.ModNone, gui.viewAllSubscriptionResources); err != nil {
+		return err
+	}
+	utils.Log("setupKeybindings: Subscription resources keybinding set")
+
+	// Type filter (T) in subscriptions panel - set filter before global search
+	if err := gui.g.SetKeybinding("subscriptions", 'T', gocui.ModNone, gui.showTypePicker); err != nil {
+		return err
+	}
+	utils.Log("setupKeybindings: Type filter in subscriptions keybinding set")
+
 	// Resource Groups panel navigation
 	if err := gui.g.SetKeybinding("resourcegroups", gocui.KeyArrowDown, gocui.ModNone, gui.nextRG); err != nil {
 		return err
@@ -617,6 +659,12 @@ func (gui *Gui) setupKeybindings() error {
 	if err := gui.g.SetKeybinding("", '/', gocui.ModNone, gui.startSearch); err != nil {
 		return err
 	}
+
+	// Type filter (T) - opens type picker modal for resources panel
+	if err := gui.g.SetKeybinding("resources", 'T', gocui.ModNone, gui.showTypePicker); err != nil {
+		return err
+	}
+	utils.Log("setupKeybindings: Type filter keybinding set")
 
 	// Escape to clear filter (for list panels)
 	if err := gui.g.SetKeybinding("subscriptions", gocui.KeyEsc, gocui.ModNone, gui.clearFilter); err != nil {
@@ -1265,11 +1313,25 @@ func (gui *Gui) clearFilter(g *gocui.Gui, v *gocui.View) error {
 	gui.mu.RLock()
 	activePanel := gui.activePanel
 	showingVersion := gui.showingVersion
+	globalSearchMode := gui.globalSearchMode
+	subscriptionViewMode := gui.subscriptionViewMode
 	gui.mu.RUnlock()
 
 	// First check if we're showing version info - if so, clear it
 	if showingVersion {
 		gui.clearVersionDisplay()
+		return nil
+	}
+
+	// Check if we're in global search mode - exit it
+	if globalSearchMode && activePanel == "resources" {
+		gui.exitGlobalSearchMode()
+		return nil
+	}
+
+	// Check if we're in subscription view mode - exit it
+	if subscriptionViewMode && activePanel == "resources" {
+		gui.exitSubscriptionViewMode()
 		return nil
 	}
 
@@ -1847,6 +1909,8 @@ func (gui *Gui) onRGEnter(g *gocui.Gui, v *gocui.View) error {
 		gui.selectedRG = rg
 		rgName := rg.Name
 		subID := gui.selectedSub.ID
+		// Clear type filter when switching resource groups
+		gui.activeTypeFilter = ""
 		gui.mu.Unlock()
 
 		// Check if resources are already cached for this resource group
@@ -2128,6 +2192,7 @@ func (gui *Gui) scrollPageUp(g *gocui.Gui, v *gocui.View) error {
 func (gui *Gui) updatePanelTitles() {
 	gui.mu.RLock()
 	activePanel := gui.activePanel
+	activeTypeFilter := gui.activeTypeFilter
 	gui.mu.RUnlock()
 
 	// Update frame colors to show which panel is active (green = active, white = inactive)
@@ -2152,6 +2217,22 @@ func (gui *Gui) updatePanelTitles() {
 			gui.resourcesView.FrameColor = gocui.ColorGreen
 		} else {
 			gui.resourcesView.FrameColor = gocui.ColorWhite
+		}
+		// Update title based on mode
+		gui.mu.RLock()
+		globalSearchMode := gui.globalSearchMode
+		subscriptionViewMode := gui.subscriptionViewMode
+		gui.mu.RUnlock()
+
+		if globalSearchMode {
+			gui.resourcesView.Title = " Global Search Results "
+		} else if subscriptionViewMode {
+			gui.resourcesView.Title = " All Subscription Resources "
+		} else if activeTypeFilter != "" {
+			displayName := resources.GetResourceTypeDisplayName(activeTypeFilter)
+			gui.resourcesView.Title = fmt.Sprintf(" Resources [%s] ", displayName)
+		} else {
+			gui.resourcesView.Title = " Resources "
 		}
 	}
 
@@ -2920,11 +3001,39 @@ func (gui *Gui) updateStatus() {
 	var status string
 	switch activePanel {
 	case "subscriptions":
-		if gui.subList.IsFiltering() {
-			status = fmt.Sprintf("Filter: \"%s\" (%d/%d) | Esc: Clear | Enter: Load RGs | c: Copy | o: Open | Tab: Switch | r: Refresh | q: Quit",
-				gui.subList.GetFilterText(), subShowing, subTotal)
+		// Check if in global search input mode
+		gui.mu.RLock()
+		globalSearchMode := gui.globalSearchMode
+		globalSearchQuery := gui.globalSearchQuery
+		typeFilter := gui.activeTypeFilter
+		gui.mu.RUnlock()
+
+		typeFilterName := ""
+		if typeFilter != "" {
+			typeFilterName = resources.GetResourceTypeDisplayName(typeFilter)
+		}
+
+		if globalSearchMode && gui.isSearching {
+			if typeFilterName != "" {
+				status = fmt.Sprintf("Global Search [%s]: %s_ | Enter: Search | Esc: Cancel", typeFilterName, globalSearchQuery)
+			} else {
+				status = fmt.Sprintf("Global Search: %s_ | Enter: Search | Esc: Cancel", globalSearchQuery)
+			}
+		} else if gui.subList.IsFiltering() {
+			if typeFilterName != "" {
+				status = fmt.Sprintf("Filter: \"%s\" (%d/%d) | Type: %s | Esc: Clear | T: Types | A: All | G: Global | c: Copy | q: Quit",
+					gui.subList.GetFilterText(), subShowing, subTotal, typeFilterName)
+			} else {
+				status = fmt.Sprintf("Filter: \"%s\" (%d/%d) | Esc: Clear | Enter: Load RGs | T: Types | A: All | G: Global | c: Copy | q: Quit",
+					gui.subList.GetFilterText(), subShowing, subTotal)
+			}
 		} else {
-			status = fmt.Sprintf("↑↓: Navigate | /: Search | Enter: Load RGs | c: Copy | o: Open | Tab: Switch | r: Refresh | q: Quit | Subs: %d", subTotal)
+			if typeFilterName != "" {
+				status = fmt.Sprintf("↑↓: Navigate | Type: %s | T: Types | /: Search | A: All | G: Global | c: Copy | o: Open | r: Refresh | q: Quit | Subs: %d",
+					typeFilterName, subTotal)
+			} else {
+				status = fmt.Sprintf("↑↓: Navigate | /: Search | T: Types | Enter: Load RGs | A: All | G: Global | c: Copy | o: Open | r: Refresh | q: Quit | Subs: %d", subTotal)
+			}
 		}
 	case "resourcegroups":
 		if gui.rgList.IsFiltering() {
@@ -2934,11 +3043,61 @@ func (gui *Gui) updateStatus() {
 			status = fmt.Sprintf("↑↓: Navigate | /: Search | Enter: Load Resources | c: Copy | o: Open | Tab: Switch | []: Tabs | r: Refresh | q: Quit | RGs: %d", rgTotal)
 		}
 	case "resources":
-		if gui.resList.IsFiltering() {
-			status = fmt.Sprintf("Filter: \"%s\" (%d/%d) | Esc: Clear | Enter: View Details | c: Copy | o: Open | Tab: Switch | r: Refresh | q: Quit",
-				gui.resList.GetFilterText(), resShowing, resTotal)
+		// Check if in global search mode or subscription view mode
+		gui.mu.RLock()
+		globalSearchMode := gui.globalSearchMode
+		globalSearchQuery := gui.globalSearchQuery
+		subscriptionViewMode := gui.subscriptionViewMode
+		activeTypeFilter := gui.activeTypeFilter
+		gui.mu.RUnlock()
+
+		if globalSearchMode {
+			// Global search results mode
+			typeFilterName := ""
+			if activeTypeFilter != "" {
+				typeFilterName = resources.GetResourceTypeDisplayName(activeTypeFilter)
+			}
+			if gui.isSearching {
+				if typeFilterName != "" {
+					status = fmt.Sprintf("Global Search: %s_ [%s] | Enter: Search | Esc: Cancel", globalSearchQuery, typeFilterName)
+				} else {
+					status = fmt.Sprintf("Global Search: %s_ | Enter: Search | Esc: Cancel", globalSearchQuery)
+				}
+			} else {
+				if typeFilterName != "" {
+					status = fmt.Sprintf("Global: \"%s\" [%s] | ↑↓: Navigate | Enter: View | T: Types | Esc: Exit | c: Copy | o: Open | Results: %d",
+						globalSearchQuery, typeFilterName, resTotal)
+				} else {
+					status = fmt.Sprintf("Global: \"%s\" | ↑↓: Navigate | Enter: View | T: Types | Esc: Exit | c: Copy | o: Open | Results: %d",
+						globalSearchQuery, resTotal)
+				}
+			}
+		} else if subscriptionViewMode {
+			// Subscription-level resource view mode
+			typeFilterName := gui.getTypeFilterDisplayName()
+			if typeFilterName != "" {
+				status = fmt.Sprintf("All Resources [%s] | ↑↓: Navigate | Enter: View Details | T: Types | Esc: Exit | c: Copy | o: Open | Results: %d",
+					typeFilterName, resTotal)
+			} else {
+				status = fmt.Sprintf("All Subscription Resources | ↑↓: Navigate | /: Search | T: Filter Type | Enter: View Details | Esc: Exit | c: Copy | o: Open | Results: %d", resTotal)
+			}
 		} else {
-			status = fmt.Sprintf("↑↓: Navigate | /: Search | Enter: View Details | c: Copy | o: Open | Tab: Switch | []: Tabs | r: Refresh | q: Quit | Resources: %d", resTotal)
+			// Normal resources panel
+			typeFilterName := gui.getTypeFilterDisplayName()
+			if gui.resList.IsFiltering() {
+				if typeFilterName != "" {
+					status = fmt.Sprintf("Filter: \"%s\" | Type: %s (%d/%d) | Esc: Clear | T: Types | c: Copy | o: Open | Tab: Switch | q: Quit",
+						gui.resList.GetFilterText(), typeFilterName, resShowing, resTotal)
+				} else {
+					status = fmt.Sprintf("Filter: \"%s\" (%d/%d) | Esc: Clear | Enter: View Details | T: Types | c: Copy | o: Open | Tab: Switch | q: Quit",
+						gui.resList.GetFilterText(), resShowing, resTotal)
+				}
+			} else if typeFilterName != "" {
+				status = fmt.Sprintf("Type: %s (%d/%d) | T: Clear/Change | /: Search | Enter: View Details | c: Copy | o: Open | Tab: Switch | q: Quit",
+					typeFilterName, resShowing, resTotal)
+			} else {
+				status = fmt.Sprintf("↑↓: Navigate | /: Search | T: Filter by Type | Enter: View Details | c: Copy | o: Open | Tab: Switch | []: Tabs | r: Refresh | q: Quit | Resources: %d", resTotal)
+			}
 		}
 	case "main":
 		if gui.mainPanelSearch != nil && gui.mainPanelSearch.IsActive() {
@@ -3478,15 +3637,32 @@ func (gui *Gui) loadResourceDetails(originalRes *domain.Resource) {
 		gui.mu.RLock()
 		resClient := gui.resClient
 		subscriptionID := ""
-		if gui.selectedSub != nil {
+		// Prefer the resource's subscription ID (for global search results)
+		// Fall back to selected subscription (for normal browsing)
+		if originalRes.SubscriptionID != "" {
+			subscriptionID = originalRes.SubscriptionID
+		} else if gui.selectedSub != nil {
 			subscriptionID = gui.selectedSub.ID
 		}
 		gui.mu.RUnlock()
 
-		// Create client if not available (e.g., when using cached resources)
-		if resClient == nil {
+		// Create client if not available or if subscription doesn't match
+		// (e.g., when using cached resources or global search results from different subscription)
+		needNewClient := resClient == nil
+		if !needNewClient && subscriptionID != "" {
+			// Check if current client is for a different subscription
+			gui.mu.RLock()
+			currentSubID := ""
+			if gui.selectedSub != nil {
+				currentSubID = gui.selectedSub.ID
+			}
+			gui.mu.RUnlock()
+			needNewClient = currentSubID != subscriptionID
+		}
+
+		if needNewClient {
 			if subscriptionID == "" {
-				utils.Log("loadResourceDetails: No subscription selected")
+				utils.Log("loadResourceDetails: No subscription available")
 				gui.mu.Lock()
 				gui.loadingRes = false
 				gui.mu.Unlock()
@@ -3510,11 +3686,7 @@ func (gui *Gui) loadResourceDetails(originalRes *domain.Resource) {
 				})
 				return
 			}
-
-			// Store the client for future use
-			gui.mu.Lock()
-			gui.resClient = resClient
-			gui.mu.Unlock()
+			utils.Log("loadResourceDetails: Created new client for subscription")
 		}
 
 		// Fetch full resource details with provider-specific properties
@@ -4002,4 +4174,738 @@ func (gui *Gui) preloadTopResources(subscriptionID string, rgs []*domain.Resourc
 			utils.Log("preloadTopResources: Cached %d resources for RG #%d", len(resources), index)
 		}(rgName, i)
 	}
+}
+
+// showTypePicker opens the type picker modal for filtering resources by type
+func (gui *Gui) showTypePicker(g *gocui.Gui, v *gocui.View) error {
+	utils.Log("showTypePicker: Opening type picker")
+
+	// Create type picker if not exists
+	if gui.typePicker == nil {
+		gui.typePicker = panels.NewTypePicker(gui.g, gui.onTypeSelected, gui.onTypePickerCancel)
+	}
+
+	return gui.typePicker.Show()
+}
+
+// onTypeSelected is called when a type is selected in the type picker
+func (gui *Gui) onTypeSelected(resourceType string) {
+	utils.Log("onTypeSelected: Type selected (filter active: %v)", resourceType != "")
+
+	gui.mu.Lock()
+	gui.activeTypeFilter = resourceType
+	prevPanel := gui.activePanel
+	globalSearchMode := gui.globalSearchMode
+	globalSearchQuery := gui.globalSearchQuery
+	subscriptionViewMode := gui.subscriptionViewMode
+	gui.mu.Unlock()
+
+	// Restore focus to appropriate panel
+	if globalSearchMode || subscriptionViewMode {
+		gui.g.SetCurrentView("resources")
+		gui.mu.Lock()
+		gui.activePanel = "resources"
+		gui.mu.Unlock()
+	} else if prevPanel == "subscriptions" {
+		// Stay in subscriptions panel if that's where we were
+		gui.g.SetCurrentView("subscriptions")
+		gui.mu.Lock()
+		gui.activePanel = "subscriptions"
+		gui.mu.Unlock()
+	} else {
+		gui.g.SetCurrentView("resources")
+		gui.mu.Lock()
+		gui.activePanel = "resources"
+		gui.mu.Unlock()
+	}
+
+	// Handle special modes - re-execute the search with new filter
+	if globalSearchMode && globalSearchQuery != "" {
+		// Re-run global search with the new type filter
+		gui.rerunGlobalSearch()
+	} else if subscriptionViewMode {
+		// Re-run subscription view with new type filter
+		gui.rerunSubscriptionView()
+	} else if resourceType != "" {
+		// Apply client-side type filter to current resource list
+		gui.applyTypeFilter()
+	} else {
+		// Clear filter - reload resources without filter
+		gui.clearTypeFilter()
+	}
+
+	gui.updatePanelTitles()
+	gui.updateStatus()
+
+	utils.Log("onTypeSelected: Filter applied, restored focus from %s", prevPanel)
+}
+
+// onTypePickerCancel is called when the type picker is cancelled
+func (gui *Gui) onTypePickerCancel() {
+	utils.Log("onTypePickerCancel: Type picker cancelled")
+
+	// Restore focus to appropriate panel
+	gui.mu.RLock()
+	globalSearchMode := gui.globalSearchMode
+	subscriptionViewMode := gui.subscriptionViewMode
+	gui.mu.RUnlock()
+
+	// If we're in global search or subscription view mode, return to resources
+	// Otherwise, return to the panel that was active before type picker
+	if globalSearchMode || subscriptionViewMode {
+		gui.g.SetCurrentView("resources")
+		gui.mu.Lock()
+		gui.activePanel = "resources"
+		gui.mu.Unlock()
+	} else {
+		// Default to resources panel, but check if we have resources loaded
+		gui.mu.RLock()
+		hasResources := len(gui.resources) > 0
+		gui.mu.RUnlock()
+
+		if hasResources {
+			gui.g.SetCurrentView("resources")
+			gui.mu.Lock()
+			gui.activePanel = "resources"
+			gui.mu.Unlock()
+		} else {
+			// No resources loaded, return to subscriptions
+			gui.g.SetCurrentView("subscriptions")
+			gui.mu.Lock()
+			gui.activePanel = "subscriptions"
+			gui.mu.Unlock()
+		}
+	}
+
+	gui.updatePanelTitles()
+	gui.updateStatus()
+}
+
+// applyTypeFilter filters the current resource list by the active type filter
+func (gui *Gui) applyTypeFilter() {
+	gui.mu.RLock()
+	activeFilter := gui.activeTypeFilter
+	allResources := gui.resources
+	gui.mu.RUnlock()
+
+	if activeFilter == "" || len(allResources) == 0 {
+		return
+	}
+
+	// Filter resources by type (case-insensitive comparison)
+	filterLower := strings.ToLower(activeFilter)
+	var filtered []*domain.Resource
+	for _, res := range allResources {
+		if strings.ToLower(res.Type) == filterLower {
+			filtered = append(filtered, res)
+		}
+	}
+
+	// Update the filtered list with type-filtered results
+	gui.resList.SetItems(filtered, func(res *domain.Resource) string {
+		return formatWithGraySuffix(res.DisplayString(), res.GetDisplaySuffix())
+	})
+
+	// Update selection
+	gui.mu.Lock()
+	if len(filtered) > 0 {
+		gui.selectedRes = filtered[0]
+	} else {
+		gui.selectedRes = nil
+	}
+	gui.mu.Unlock()
+
+	gui.g.UpdateAsync(func(g *gocui.Gui) error {
+		gui.refreshResourcesPanel()
+		gui.refreshMainPanel()
+		return nil
+	})
+
+	utils.Log("applyTypeFilter: Filtered to %d/%d resources", len(filtered), len(allResources))
+}
+
+// clearTypeFilter removes the type filter and shows all resources
+func (gui *Gui) clearTypeFilter() {
+	gui.mu.RLock()
+	allResources := gui.resources
+	gui.mu.RUnlock()
+
+	// Restore full resource list
+	gui.resList.SetItems(allResources, func(res *domain.Resource) string {
+		return formatWithGraySuffix(res.DisplayString(), res.GetDisplaySuffix())
+	})
+
+	// Update selection
+	gui.mu.Lock()
+	if len(allResources) > 0 {
+		gui.selectedRes = allResources[0]
+	} else {
+		gui.selectedRes = nil
+	}
+	gui.mu.Unlock()
+
+	gui.g.UpdateAsync(func(g *gocui.Gui) error {
+		gui.refreshResourcesPanel()
+		gui.refreshMainPanel()
+		return nil
+	})
+
+	utils.Log("clearTypeFilter: Showing all %d resources", len(allResources))
+}
+
+// getTypeFilterDisplayName returns the display name for the active type filter
+func (gui *Gui) getTypeFilterDisplayName() string {
+	gui.mu.RLock()
+	activeFilter := gui.activeTypeFilter
+	gui.mu.RUnlock()
+
+	if activeFilter == "" {
+		return ""
+	}
+
+	// Get display name from resources package
+	return resources.GetResourceTypeDisplayName(activeFilter)
+}
+
+// ============================================================================
+// Global Search (Cross-Subscription Resource Graph Search)
+// ============================================================================
+
+// startGlobalSearch initiates a cross-subscription search using Resource Graph
+func (gui *Gui) startGlobalSearch(g *gocui.Gui, v *gocui.View) error {
+	utils.Log("startGlobalSearch: Starting global search mode")
+
+	// Check if Resource Graph client is available
+	gui.mu.RLock()
+	rgClient := gui.resourceGraphClient
+	gui.mu.RUnlock()
+
+	if rgClient == nil {
+		utils.Log("startGlobalSearch: Resource Graph client not available")
+		// Show error in status bar
+		gui.g.UpdateAsync(func(g *gocui.Gui) error {
+			if gui.statusView != nil {
+				gui.statusView.Clear()
+				fmt.Fprint(gui.statusView, "Global search unavailable - Resource Graph client not initialized")
+			}
+			return nil
+		})
+		return nil
+	}
+
+	// Enter global search mode
+	gui.mu.Lock()
+	gui.globalSearchMode = true
+	gui.globalSearchQuery = ""
+	gui.mu.Unlock()
+
+	// Create search bar with global search callbacks
+	gui.searchBar = panels.NewSearchBar(gui.g, gui.onGlobalSearchChanged, gui.onGlobalSearchCancel, gui.onGlobalSearchConfirm)
+
+	if err := gui.searchBar.Show(); err != nil {
+		utils.Log("startGlobalSearch: ERROR showing search bar: %v", err)
+		gui.mu.Lock()
+		gui.globalSearchMode = false
+		gui.mu.Unlock()
+		return err
+	}
+
+	gui.isSearching = true
+	gui.searchTarget = "global"
+	gui.setupSearchKeybindings()
+
+	// Clear resources panel to show placeholder
+	gui.resList.SetItems([]*domain.Resource{}, func(res *domain.Resource) string { return "" })
+	gui.g.UpdateAsync(func(g *gocui.Gui) error {
+		gui.refreshResourcesPanel()
+		gui.updatePanelTitles()
+		gui.updateStatus()
+		return nil
+	})
+
+	utils.Log("startGlobalSearch: Global search mode activated")
+	return nil
+}
+
+// rerunGlobalSearch re-executes the global search with the current type filter
+func (gui *Gui) rerunGlobalSearch() {
+	gui.mu.RLock()
+	query := gui.globalSearchQuery
+	gui.mu.RUnlock()
+
+	if query == "" {
+		return
+	}
+
+	utils.Log("rerunGlobalSearch: Re-running search with query=%s", query)
+	gui.executeGlobalSearch(query)
+}
+
+// rerunSubscriptionView re-executes the subscription view with the current type filter
+func (gui *Gui) rerunSubscriptionView() {
+	gui.mu.RLock()
+	selectedSub := gui.selectedSub
+	typeFilter := gui.activeTypeFilter
+	rgClient := gui.resourceGraphClient
+	gui.mu.RUnlock()
+
+	if selectedSub == nil || rgClient == nil {
+		return
+	}
+
+	utils.Log("rerunSubscriptionView: Re-running subscription view with typeFilter=%s", typeFilter)
+
+	// Set loading state
+	gui.mu.Lock()
+	gui.loadingRes = true
+	gui.mu.Unlock()
+
+	gui.g.UpdateAsync(func(g *gocui.Gui) error {
+		gui.updateStatus()
+		return nil
+	})
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), APITimeout)
+		defer cancel()
+
+		var results []*domain.Resource
+		var err error
+
+		if typeFilter != "" {
+			results, err = rgClient.ListResourcesByType(ctx, typeFilter, []string{selectedSub.ID})
+		} else {
+			results, err = rgClient.ListResourcesBySubscription(ctx, selectedSub.ID)
+		}
+
+		if err != nil {
+			utils.Log("rerunSubscriptionView: Error: %v", err)
+			gui.mu.Lock()
+			gui.loadingRes = false
+			gui.mu.Unlock()
+			gui.g.UpdateAsync(func(g *gocui.Gui) error {
+				gui.updateStatus()
+				return nil
+			})
+			return
+		}
+
+		// Sort results
+		sortResources(results)
+
+		// Update resources with subscription view display format
+		gui.resList.SetItems(results, func(res *domain.Resource) string {
+			return gui.formatSubscriptionViewResult(res)
+		})
+
+		gui.mu.Lock()
+		gui.resources = results
+		if len(results) > 0 {
+			gui.selectedRes = results[0]
+		} else {
+			gui.selectedRes = nil
+		}
+		gui.loadingRes = false
+		gui.mu.Unlock()
+
+		gui.g.UpdateAsync(func(g *gocui.Gui) error {
+			gui.refreshResourcesPanel()
+			gui.updateStatus()
+			return nil
+		})
+
+		utils.Log("rerunSubscriptionView: Found %d results", len(results))
+	}()
+}
+
+// onGlobalSearchChanged is called when the global search text changes
+// This only updates the UI to show what the user is typing - no API calls
+func (gui *Gui) onGlobalSearchChanged() {
+	query := gui.searchBar.GetText()
+
+	gui.mu.Lock()
+	gui.globalSearchQuery = query
+	gui.mu.Unlock()
+
+	// Just update the status bar to show the query being typed
+	gui.g.UpdateAsync(func(g *gocui.Gui) error {
+		gui.updateStatus()
+		return nil
+	})
+}
+
+// onGlobalSearchConfirm is called when the user presses Enter in global search
+func (gui *Gui) onGlobalSearchConfirm() {
+	gui.mu.RLock()
+	query := gui.globalSearchQuery
+	gui.mu.RUnlock()
+
+	utils.Log("onGlobalSearchConfirm: Confirming global search with query: %s", query)
+
+	// Hide search bar but stay in global search mode
+	gui.searchBar.Hide()
+	gui.isSearching = false
+
+	// Don't search for empty queries
+	if query == "" {
+		utils.Log("onGlobalSearchConfirm: Empty query, exiting global search")
+		gui.exitGlobalSearchMode()
+		return
+	}
+
+	// Switch focus to resources panel to navigate results
+	gui.g.SetCurrentView("resources")
+	gui.mu.Lock()
+	gui.activePanel = "resources"
+	gui.mu.Unlock()
+
+	gui.updatePanelTitles()
+	gui.updateStatus()
+
+	// Execute the search
+	gui.executeGlobalSearch(query)
+}
+
+// executeGlobalSearch performs the actual global search query
+func (gui *Gui) executeGlobalSearch(query string) {
+	utils.Log("executeGlobalSearch: START with query='%s'", query)
+
+	gui.mu.RLock()
+	rgClient := gui.resourceGraphClient
+	typeFilter := gui.activeTypeFilter
+	subs := gui.subscriptions
+	gui.mu.RUnlock()
+
+	utils.Log("executeGlobalSearch: rgClient=%v, typeFilter='%s', subs=%d", rgClient != nil, typeFilter, len(subs))
+
+	if rgClient == nil || len(subs) == 0 {
+		utils.Log("executeGlobalSearch: No client or subscriptions available")
+		return
+	}
+
+	// Set loading state
+	gui.mu.Lock()
+	gui.loadingRes = true
+	gui.mu.Unlock()
+
+	gui.g.UpdateAsync(func(g *gocui.Gui) error {
+		gui.updateStatus()
+		return nil
+	})
+
+	// Get subscription IDs
+	subIDs := make([]string, len(subs))
+	for i, sub := range subs {
+		subIDs[i] = sub.ID
+	}
+
+	// Build subscription name map for formatting
+	subNameMap := make(map[string]string)
+	for _, sub := range subs {
+		subNameMap[sub.ID] = sub.Name
+	}
+
+	utils.Log("executeGlobalSearch: Searching for '%s' across %d subscriptions", query, len(subIDs))
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), APITimeout)
+		defer cancel()
+
+		// Store cancel function for potential cancellation
+		gui.mu.Lock()
+		gui.globalSearchCancel = cancel
+		gui.mu.Unlock()
+
+		results, err := rgClient.SearchResources(ctx, query, typeFilter, subIDs)
+		if err != nil {
+			if ctx.Err() == context.Canceled {
+				utils.Log("executeGlobalSearch: Search cancelled")
+				return
+			}
+			utils.Log("executeGlobalSearch: Search error: %v", err)
+			gui.mu.Lock()
+			gui.loadingRes = false
+			gui.mu.Unlock()
+			gui.g.UpdateAsync(func(g *gocui.Gui) error {
+				gui.updateStatus()
+				return nil
+			})
+			return
+		}
+
+		utils.Log("executeGlobalSearch: Got %d results", len(results))
+
+		// Sort results alphabetically
+		sortResources(results)
+
+		// Update resources with subscription context display
+		gui.resList.SetItems(results, func(res *domain.Resource) string {
+			return formatGlobalSearchResultWithMap(res, subNameMap)
+		})
+
+		gui.mu.Lock()
+		gui.resources = results
+		if len(results) > 0 {
+			gui.selectedRes = results[0]
+		} else {
+			gui.selectedRes = nil
+		}
+		gui.loadingRes = false
+		gui.mu.Unlock()
+
+		gui.g.UpdateAsync(func(g *gocui.Gui) error {
+			gui.refreshResourcesPanel()
+			gui.updateStatus()
+			return nil
+		})
+
+		utils.Log("executeGlobalSearch: Done, found %d results", len(results))
+	}()
+}
+
+// onGlobalSearchCancel is called when the user presses Escape in global search
+func (gui *Gui) onGlobalSearchCancel() {
+	utils.Log("onGlobalSearchCancel: Cancelling global search")
+	gui.exitGlobalSearchMode()
+}
+
+// exitGlobalSearchMode cleans up global search state and returns to normal mode
+func (gui *Gui) exitGlobalSearchMode() {
+	// Cancel any in-progress search
+	gui.mu.Lock()
+	if gui.globalSearchCancel != nil {
+		gui.globalSearchCancel()
+		gui.globalSearchCancel = nil
+	}
+	gui.globalSearchMode = false
+	gui.globalSearchQuery = ""
+	gui.mu.Unlock()
+
+	// Hide search bar
+	if gui.searchBar != nil {
+		gui.searchBar.Hide()
+	}
+	gui.isSearching = false
+
+	// Clear resources panel
+	gui.resList.SetItems([]*domain.Resource{}, func(res *domain.Resource) string { return "" })
+	gui.mu.Lock()
+	gui.resources = nil
+	gui.selectedRes = nil
+	gui.mu.Unlock()
+
+	// Return focus to subscriptions panel
+	gui.g.SetCurrentView("subscriptions")
+	gui.mu.Lock()
+	gui.activePanel = "subscriptions"
+	gui.mu.Unlock()
+
+	gui.g.UpdateAsync(func(g *gocui.Gui) error {
+		gui.refreshResourcesPanel()
+		gui.updatePanelTitles()
+		gui.updateStatus()
+		return nil
+	})
+}
+
+// formatGlobalSearchResult formats a resource for display in global search results
+// Format: "name (rg-name / Type)" or "name (sub-name / rg-name / Type)" depending on context
+// Note: This method acquires gui.mu - do NOT call from inside SetItems callback
+func (gui *Gui) formatGlobalSearchResult(res *domain.Resource) string {
+	// Build subscription name map
+	gui.mu.RLock()
+	subNameMap := make(map[string]string)
+	for _, sub := range gui.subscriptions {
+		subNameMap[sub.ID] = sub.Name
+	}
+	gui.mu.RUnlock()
+
+	return formatGlobalSearchResultWithMap(res, subNameMap)
+}
+
+// formatGlobalSearchResultWithMap formats a resource using a pre-built subscription name map
+// This is safe to call from inside SetItems callback since it doesn't acquire locks
+func formatGlobalSearchResultWithMap(res *domain.Resource, subNameMap map[string]string) string {
+	typeName := resources.GetResourceTypeDisplayName(res.Type)
+
+	subName := subNameMap[res.SubscriptionID]
+
+	// Format with subscription and RG context
+	if subName != "" {
+		// Truncate long names
+		if len(subName) > 15 {
+			subName = subName[:12] + "..."
+		}
+		rgName := res.ResourceGroup
+		if len(rgName) > 15 {
+			rgName = rgName[:12] + "..."
+		}
+		return fmt.Sprintf("%s %s(%s / %s / %s)%s", res.Name, grayColor, subName, rgName, typeName, resetColor)
+	}
+
+	// Fallback: just RG and type
+	return fmt.Sprintf("%s %s(%s / %s)%s", res.Name, grayColor, res.ResourceGroup, typeName, resetColor)
+}
+
+// ============================================================================
+// Subscription-Level Resource View (All Resources in Subscription)
+// ============================================================================
+
+// viewAllSubscriptionResources loads all resources in the selected subscription using Resource Graph
+func (gui *Gui) viewAllSubscriptionResources(g *gocui.Gui, v *gocui.View) error {
+	if gui.subList.Len() == 0 {
+		return nil
+	}
+
+	_, cy := v.Cursor()
+	_, oy := v.Origin()
+
+	sub, ok := gui.subList.Get(oy + cy)
+	if !ok {
+		return nil
+	}
+
+	utils.Log("viewAllSubscriptionResources: Loading all resources for subscription")
+
+	// Check if Resource Graph client is available
+	gui.mu.RLock()
+	rgClient := gui.resourceGraphClient
+	gui.mu.RUnlock()
+
+	if rgClient == nil {
+		utils.Log("viewAllSubscriptionResources: Resource Graph client not available")
+		gui.g.UpdateAsync(func(g *gocui.Gui) error {
+			if gui.statusView != nil {
+				gui.statusView.Clear()
+				fmt.Fprint(gui.statusView, "Subscription view unavailable - Resource Graph client not initialized")
+			}
+			return nil
+		})
+		return nil
+	}
+
+	// Set subscription and enter subscription view mode
+	gui.mu.Lock()
+	gui.selectedSub = sub
+	gui.selectedRG = nil // No RG selected in subscription view
+	gui.subscriptionViewMode = true
+	gui.activeTypeFilter = "" // Clear type filter
+	gui.loadingRes = true
+	gui.mu.Unlock()
+
+	// Clear RGs and show loading state
+	gui.rgList.SetItems([]*domain.ResourceGroup{}, func(rg *domain.ResourceGroup) string { return "" })
+	gui.resList.SetItems([]*domain.Resource{}, func(res *domain.Resource) string { return "" })
+
+	gui.g.Update(func(g *gocui.Gui) error {
+		gui.refreshResourceGroupsPanel()
+		gui.refreshResourcesPanel()
+		gui.updatePanelTitles()
+		gui.updateStatus()
+		return nil
+	})
+
+	// Load resources in background
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), APITimeout)
+		defer cancel()
+
+		gui.mu.RLock()
+		subID := gui.selectedSub.ID
+		typeFilter := gui.activeTypeFilter
+		gui.mu.RUnlock()
+
+		// Use Resource Graph to get all resources in subscription
+		results, err := rgClient.SearchResources(ctx, "", typeFilter, []string{subID})
+		if err != nil {
+			utils.Log("viewAllSubscriptionResources: Error loading resources: %v", err)
+			gui.mu.Lock()
+			gui.loadingRes = false
+			gui.mu.Unlock()
+			gui.g.UpdateAsync(func(g *gocui.Gui) error {
+				gui.updateStatus()
+				return nil
+			})
+			return
+		}
+
+		// Sort results
+		sortResources(results)
+
+		// Update resources with RG context display
+		gui.resList.SetItems(results, func(res *domain.Resource) string {
+			return gui.formatSubscriptionViewResult(res)
+		})
+
+		gui.mu.Lock()
+		gui.resources = results
+		if len(results) > 0 {
+			gui.selectedRes = results[0]
+		} else {
+			gui.selectedRes = nil
+		}
+		gui.loadingRes = false
+		gui.mu.Unlock()
+
+		gui.g.UpdateAsync(func(g *gocui.Gui) error {
+			gui.refreshResourcesPanel()
+			gui.updatePanelTitles()
+			gui.updateStatus()
+			return nil
+		})
+
+		// Switch to resources panel
+		gui.g.SetCurrentView("resources")
+		gui.mu.Lock()
+		gui.activePanel = "resources"
+		gui.mu.Unlock()
+
+		gui.g.UpdateAsync(func(g *gocui.Gui) error {
+			gui.updatePanelTitles()
+			gui.updateStatus()
+			return nil
+		})
+
+		utils.Log("viewAllSubscriptionResources: Loaded %d resources", len(results))
+	}()
+
+	return nil
+}
+
+// formatSubscriptionViewResult formats a resource for subscription-level view
+// Format: "name (rg-name / Type)"
+func (gui *Gui) formatSubscriptionViewResult(res *domain.Resource) string {
+	typeName := resources.GetResourceTypeDisplayName(res.Type)
+	rgName := res.ResourceGroup
+	if len(rgName) > 20 {
+		rgName = rgName[:17] + "..."
+	}
+	return fmt.Sprintf("%s %s(%s / %s)%s", res.Name, grayColor, rgName, typeName, resetColor)
+}
+
+// exitSubscriptionViewMode exits subscription-level view and returns to normal navigation
+func (gui *Gui) exitSubscriptionViewMode() {
+	gui.mu.Lock()
+	gui.subscriptionViewMode = false
+	gui.mu.Unlock()
+
+	// Clear resources
+	gui.resList.SetItems([]*domain.Resource{}, func(res *domain.Resource) string { return "" })
+	gui.mu.Lock()
+	gui.resources = nil
+	gui.selectedRes = nil
+	gui.mu.Unlock()
+
+	// Return focus to subscriptions panel
+	gui.g.SetCurrentView("subscriptions")
+	gui.mu.Lock()
+	gui.activePanel = "subscriptions"
+	gui.mu.Unlock()
+
+	gui.g.UpdateAsync(func(g *gocui.Gui) error {
+		gui.refreshResourcesPanel()
+		gui.updatePanelTitles()
+		gui.updateStatus()
+		return nil
+	})
 }
