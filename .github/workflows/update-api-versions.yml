@@ -22,7 +22,11 @@ jobs:
       - name: Check for changes
         id: check-changes
         run: |
-          if ! git diff --exit-code pkg/azure/api_versions_curated.json; then
+          git show HEAD:pkg/azure/api_versions_curated.json 2>/dev/null | \
+            jq --sort-keys '.apiVersions' > /tmp/old_versions.json 2>/dev/null || \
+            echo '{}' > /tmp/old_versions.json
+          jq --sort-keys '.apiVersions' pkg/azure/api_versions_curated.json > /tmp/new_versions.json
+          if ! diff /tmp/old_versions.json /tmp/new_versions.json > /dev/null; then
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Create Pull Request
