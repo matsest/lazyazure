@@ -35,7 +35,7 @@ test-integration: build
 	@./scripts/test-scrolling.sh
 	@./scripts/test-search.sh
 	@./scripts/test-panel-switch.sh
-	@echo "✓ All integration tests passed!"
+	@printf "\033[0;32m✓\033[0m All integration tests passed!\n"
 
 .PHONY: clean
 clean:

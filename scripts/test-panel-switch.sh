@@ -142,7 +142,7 @@ fi
 
 # Also verify frame color
 if check_frame_colors "subscriptions"; then
-  echo "  ✓ Subscriptions frame is green (other panels are white)"
+  echo -e "  ${GREEN}✓${NC} Subscriptions frame is green (other panels are white)"
 else
   echo -e "  ${YELLOW}WARNING${NC}: Could not verify frame color (may need visual check)"
 fi

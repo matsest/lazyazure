@@ -30,18 +30,17 @@ tmux new-session -d -s "$SESSION" $DIMENSIONS
 echo "Starting app in demo mode (LAZYAZURE_DEMO=2)..."
 tmux send-keys -t "$SESSION" "LAZYAZURE_DEMO=2 ./lazyazure" Enter
 
-# Wait for app to load
-sleep 2
-
-# Helper function to get visible subscription count
-get_visible_count() {
-  tmux capture-pane -t "$SESSION" -p | grep -c "^  " || true
-}
-
-# Helper function to capture pane content
+# Helper function
 capture() {
   tmux capture-pane -t "$SESSION" -p >"$1"
 }
+
+# Wait for subscriptions to load (poll instead of fixed sleep)
+echo "Waiting for subscriptions to load..."
+for i in {1..10}; do
+  tmux capture-pane -t "$SESSION" -p | grep -qF "(" && break
+  sleep 0.5
+done
 
 # Test 1: Verify initial state shows subscriptions
 echo ""
@@ -54,8 +53,7 @@ else
   FAILED=1
 fi
 
-# Count initial visible items
-VISIBLE_COUNT=$(get_visible_count)
+VISIBLE_COUNT=$(grep -cF "(" /tmp/initial.txt || true)
 echo "  Visible items: $VISIBLE_COUNT"
 
 # Test 2: Navigate down multiple times to test scrolling
@@ -92,7 +90,7 @@ capture /tmp/after-scroll-up.txt
 
 # Check that we're back near the top (content should be similar to initial)
 if grep -q "Demo-Tenant" /tmp/after-scroll-up.txt; then
-  echo "  ✓ Back at top of list"
+  echo -e "  ${GREEN}✓${NC} Back at top of list"
 else
   echo -e "  ${YELLOW}WARNING${NC}: May not be at exact top (expected with mixed scrolling)"
 fi
@@ -105,7 +103,7 @@ sleep 0.3
 capture /tmp/before-page-down.txt
 
 echo "  Sending Page Down..."
-tmux send-keys -t "$SESSION" PPage # Page Up key in tmux
+tmux send-keys -t "$SESSION" NPage
 sleep 0.5
 capture /tmp/after-page-down.txt
 
@@ -119,7 +117,7 @@ fi
 echo ""
 echo "Test 5: Page Up functionality"
 echo "  Sending Page Up..."
-tmux send-keys -t "$SESSION" NPage # Page Down key in tmux
+tmux send-keys -t "$SESSION" PPage
 sleep 0.5
 capture /tmp/after-page-up.txt
 
@@ -129,11 +127,9 @@ else
   echo -e "  ${GREEN}✓${NC} Page Up caused view change"
 fi
 
-# Test 6: Switch to Resource Groups and test scrolling
+# Test 6: Resource Groups panel scrolling
 echo ""
 echo "Test 6: Resource Groups panel scrolling"
-tmux send-keys -t "$SESSION" Tab
-sleep 0.5
 tmux send-keys -t "$SESSION" Enter
 sleep 1
 
@@ -141,7 +137,6 @@ capture /tmp/rg-initial.txt
 if grep -q "Resource Groups" /tmp/rg-initial.txt; then
   echo -e "  ${GREEN}✓${NC} Resource Groups panel visible"
 
-  # Try scrolling in RG panel
   echo "  Testing RG panel scrolling..."
   for i in {1..15}; do
     tmux send-keys -t "$SESSION" Down
@@ -163,8 +158,6 @@ fi
 # Test 7: Resources panel scrolling
 echo ""
 echo "Test 7: Resources panel scrolling"
-tmux send-keys -t "$SESSION" Tab
-sleep 0.5
 tmux send-keys -t "$SESSION" Enter
 sleep 1
 
@@ -172,7 +165,6 @@ capture /tmp/res-initial.txt
 if grep -q "Resources" /tmp/res-initial.txt; then
   echo -e "  ${GREEN}✓${NC} Resources panel visible"
 
-  # Try scrolling in Resources panel
   echo "  Testing Resources panel scrolling..."
   for i in {1..15}; do
     tmux send-keys -t "$SESSION" Down
