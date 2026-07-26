@@ -1,0 +1,42 @@
+name: Update Azure Resource Provider API Versions
+
+on:
+  schedule:
+    - cron: '0 6 * * 2'  # Every Tuesday at 06:00 UTC
+  workflow_dispatch:  # Allow manual trigger
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Update API versions
+        run: make update-api-versions
+      - name: Check for changes
+        id: check-changes
+        run: |
+          if ! git diff --exit-code pkg/azure/api_versions_curated.json; then
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Create Pull Request
+        if: steps.check-changes.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v8.1.1
+        with:
+          commit-message: "chore: update curated API versions"
+          title: "chore: update curated API versions"
+          body: |
+            Automated update of Azure API versions from the [bicep-types-az](https://github.com/Azure/bicep-types-az) repository.
+
+            Updates `pkg/azure/api_versions_curated.json` with the latest resource provider API versions.
+          branch: chore/auto/update-api-versions
+          base: main
+          labels: dependencies
+          assignees: matsest
+          add-paths: pkg/azure/api_versions_curated.json
