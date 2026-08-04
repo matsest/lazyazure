@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-07-26T10:49:31Z",
+  "lastUpdated": "2026-08-04T08:47:09Z",
   "source": "https://github.com/Azure/bicep-types-az",
   "resourceCount": 130,
   "apiVersions": {
@@ -25,10 +25,10 @@
     "microsoft.compute/snapshots": "2026-03-02",
     "microsoft.compute/virtualmachines": "2026-03-01",
     "microsoft.compute/virtualmachinescalesets": "2026-03-01",
-    "microsoft.containerinstance/containergroups": "2025-09-01",
+    "microsoft.containerinstance/containergroups": "2026-07-01",
     "microsoft.containerregistry/registries": "2025-11-01",
     "microsoft.containerregistry/registries/tasks": "2019-04-01",
-    "microsoft.containerservice/managedclusters": "2026-04-01",
+    "microsoft.containerservice/managedclusters": "2026-05-01",
     "microsoft.databricks/workspaces": "2026-01-01",
     "microsoft.datafactory/factories": "2018-06-01",
     "microsoft.datalakeanalytics/accounts": "2016-11-01",
@@ -54,7 +54,7 @@
     "microsoft.eventgrid/topics": "2025-02-15",
     "microsoft.eventhub/clusters": "2026-01-01",
     "microsoft.eventhub/namespaces": "2026-01-01",
-    "microsoft.hybridcompute/machines": "2025-06-01",
+    "microsoft.hybridcompute/machines": "2026-07-15",
     "microsoft.insights/actiongroups": "2023-01-01",
     "microsoft.insights/activitylogalerts": "2026-01-01",
     "microsoft.insights/components": "2020-02-02",
