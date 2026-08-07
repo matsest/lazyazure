@@ -724,7 +724,7 @@ scripts/            # TUI integration test scripts (tmux-based)
 tools/
 └── update-api-versions/
     └── main.go              # Tool to extract API versions from bicep-types-az
-.opencode/
+.agents/
 └── skills/
     └── release-summary/
         └── SKILL.md         # Release summary skill for agents
