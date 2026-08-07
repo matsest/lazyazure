@@ -40,8 +40,6 @@ gifsicle --resize-width 1000 --optimize=3 --colors=128 -o demo_optimized.gif dem
 - **Smart Resource Loading**: Fetches full resource details with provider-specific API versions
 - **Background Preloading and Caching**: Background preloading and multi-tier caching for instant navigation between previously viewed resources
 
-See [PLAN.md](./PLAN.md) for implementation details and roadmap.
-
 ## Installation
 
 ### Prerequisites
@@ -259,15 +257,6 @@ The project aims to have full cross-platform support.
 - **Windows**: Good support (recommend Windows Terminal; classic CMD/PowerShell not recommended)
 
 Linux clipboard requires `xclip` or `xsel` (X11) or `wl-copy` (Wayland). macOS and Windows have native clipboard support. If using WSL it should pick up the Windows clipboard.
-
-## Project Status
-
-- **Phase 1 (MVP)**: ✅ Complete - Auth & subscriptions working
-- **Phase 2**: ✅ Complete - Resource groups with stacked layout
-- **Phase 3**: ✅ Complete - Resources browser with 3-level hierarchy
-- **Phase 4**: 📝 In progress - Polish, performance improvements & advanced features
-
-See [PLAN.md](./PLAN.md) for the full implementation roadmap.
 
 ## Dependencies
 
