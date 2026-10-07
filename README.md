@@ -46,7 +46,7 @@ gifsicle --resize-width 1000 --optimize=3 --colors=128 -o demo_optimized.gif dem
 
 ### System Requirements
 
-- **Go**: 1.26.1+ (only needed to install from source)
+- **Go**: 1.27.1+ (only needed to install from source)
 - **Terminal**: Modern terminal with Unicode and 256-color support (IDE consoles not recommended). Some recommendations:
   - MacOS:Ghostty, iTerm2, Terminal.app
   - Linux: Ghostty, Alacritty, Kitty, etc.
