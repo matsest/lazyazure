@@ -63,6 +63,11 @@ check: fmt lint test
 fmt:
 	gofmt -w .
 
+.PHONY: update-deps
+update-deps:
+	go get -u ./...
+	go mod tidy
+
 .PHONY: update-api-versions
 update-api-versions:
 	@echo "Updating API versions from bicep-types-az..."

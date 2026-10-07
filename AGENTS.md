@@ -642,6 +642,9 @@ LAZYAZURE_DEMO=2 ./lazyazure  # Large dataset: 15 subs, 20 RGs each, 15 resource
 # Test
 make test
 
+# Update Go modules and tidy dependencies
+make update-deps
+
 # Update curated API versions from bicep-types-az
 make update-api-versions
 ```
