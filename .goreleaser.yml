@@ -19,19 +19,30 @@ builds:
       - -X main.commit={{.Commit}}
       - -X main.date={{.Date}}
 
-brews:
+homebrew_casks:
   - repository:
       owner: matsest
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    directory: Formula
+    # Casks must live in the Casks directory (this is the default).
+    directory: Casks
     homepage: "https://github.com/matsest/lazyazure"
     description: "The lazy way to view your Azure resources. TUI for drilling down into Azure subscriptions, resource groups and resources."
     license: "MIT"
-    test: |
-      system "#{bin}/lazyazure", "--help"
-    install: |
-      bin.install "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}" => "lazyazure"
+    # Name of the binary inside the release asset. Since we ship raw binaries
+    # (archives.formats: binary), GoReleaser emits
+    # `binary "lazyazure_<version>_<os>_<arch>", target: "lazyazure"`.
+    binaries:
+      - lazyazure
+    # The binary is not signed/notarized, so remove the quarantine bit after
+    # install on macOS to avoid "lazyazure is damaged and can't be opened".
+    # The staged file keeps its versioned name, so clear the whole staged dir.
+    hooks:
+      post:
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}"]
+          end
 
 archives:
   - formats: binary
@@ -81,7 +92,7 @@ release:
 
     ```bash
     # Homebrew
-    brew install matsest/tap/lazyazure
+    brew install --cask matsest/tap/lazyazure
 
     # Binary install (Apple Silicon)
     curl -LO https://github.com/matsest/lazyazure/releases/download/{{ .Tag }}/lazyazure_{{ .Version }}_darwin_arm64
@@ -92,7 +103,7 @@ release:
     ### Linux
     ```bash
     # Homebrew
-    brew install matsest/tap/lazyazure
+    brew install --cask matsest/tap/lazyazure
 
     # Binary install (x86)
     curl -LO https://github.com/matsest/lazyazure/releases/download/{{ .Tag }}/lazyazure_{{ .Version }}_linux_amd64
